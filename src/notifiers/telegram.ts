@@ -7,7 +7,6 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 async function sendMessage(message: string): Promise<boolean> {
-  console.log("텔레그램");
   try {
     const response = await fetch(`${TELEGRAM_API_URL}/sendMessage`, {
       method: "POST",

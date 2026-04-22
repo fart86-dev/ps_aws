@@ -48,6 +48,36 @@ yarn stop  # 종료
   - `?notify=false` - 알림 없음
 - `GET /infra/monitor/:service` - 특정 서비스 메트릭 조회 (:service = rds, dynamodb, waf, 알림 없음)
 
+## AWS CLI 스크립트
+
+AWS 인프라 분석을 위한 쉘 스크립트를 제공합니다.
+
+### 비용 분석
+```bash
+./scripts/check-costs.sh
+```
+- 월간 총 비용
+- 서비스별 비용 분석
+- RDS, DynamoDB 현황
+- 미사용 리소스 확인
+
+### 리소스 최적화 분석
+```bash
+./scripts/check-resources.sh
+```
+- RDS 인스턴스 상세 정보
+- DynamoDB 테이블 정보
+- Lambda 함수 목록
+- EC2 인스턴스 상태
+- 비용 최적화 권장사항
+
+### 전체 리포트
+```bash
+./scripts/summary.sh
+```
+- 통합 리포트 생성 (`/tmp/aws_summary.txt`)
+- 비용, RDS, DynamoDB, 최적화 권장사항 포함
+
 ## 스케줄러
 
 서버 시작 시 자동으로 스케줄러가 실행됩니다. `CRON_SCHEDULE` 환경변수로 실행 주기를 설정할 수 있습니다.
