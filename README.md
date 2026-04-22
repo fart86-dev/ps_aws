@@ -24,7 +24,10 @@ yarn start
 ## API 엔드포인트
 
 - `GET /health` - 서버 상태 확인
-- `POST /infra/monitor` - 전체 인프라 점검 (RDS, DynamoDB, WAF)
+- `POST /infra/monitor?notify=issues` - 전체 인프라 점검 (RDS, DynamoDB, WAF)
+  - `?notify=issues` (기본값) - 문제 발생 시만 텔레그램 알림
+  - `?notify=true` - 전체 리포트를 텔레그램으로 전송
+  - `?notify=false` - 텔레그램 알림 없음
 - `GET /infra/monitor/:service` - 특정 서비스 메트릭 조회 (:service = rds, dynamodb, waf)
 
 ## 구조
@@ -42,6 +45,12 @@ src/
 ```
 
 ## 환경 설정
+
+**.env 파일:**
+```
+BOT_TOKEN=your_telegram_bot_token
+CHAT_ID=your_telegram_chat_id
+```
 
 AWS SDK는 기본 AWS 자격증명을 사용합니다 (AWS_PROFILE, ~/.aws/credentials 등)
 

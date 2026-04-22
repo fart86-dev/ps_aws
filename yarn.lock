@@ -1562,6 +1562,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dotenv@npm:^16.4.5":
+  version: 16.6.1
+  resolution: "dotenv@npm:16.6.1"
+  checksum: 10c0/15ce56608326ea0d1d9414a5c8ee6dcf0fffc79d2c16422b4ac2268e7e2d76ff5a572d37ffe747c377de12005f14b3cc22361e79fc7f1061cce81f77d2c973dc
+  languageName: node
+  linkType: hard
+
 "env-paths@npm:^2.2.0":
   version: 2.2.1
   resolution: "env-paths@npm:2.2.1"
@@ -2053,6 +2060,7 @@ __metadata:
     "@aws-sdk/client-rds": "npm:^3.614.0"
     "@aws-sdk/client-wafv2": "npm:^3.614.0"
     "@types/node": "npm:^20.12.0"
+    dotenv: "npm:^16.4.5"
     fastify: "npm:^4.27.0"
     tsx: "npm:^4.7.0"
     typescript: "npm:^5.4.0"

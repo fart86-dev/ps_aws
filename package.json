@@ -15,6 +15,7 @@
     "@aws-sdk/client-dynamodb": "^3.614.0",
     "@aws-sdk/client-rds": "^3.614.0",
     "@aws-sdk/client-wafv2": "^3.614.0",
+    "dotenv": "^16.4.5",
     "fastify": "^4.27.0"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import { checkInfrastructure, monitorRDS, monitorDynamoDB, monitorWAF } from "./infra-monitor";
+import { sendIssueAlert, sendFullReport } from "./telegram/notifier";
 
 const fastify = Fastify({
   logger: true,
@@ -11,20 +12,35 @@ const serviceMonitors = {
   waf: monitorWAF,
 } as const;
 
+interface MonitorQuery {
+  Querystring: { notify?: "true" | "issues" | "false" };
+}
+
 fastify.get("/health", async () => {
   return { status: "ok" };
 });
 
-fastify.post("/infra/monitor", async (_request: FastifyRequest, reply: FastifyReply) => {
-  try {
-    const result = await checkInfrastructure();
-    reply.code(200).send(result);
-  } catch (error) {
-    reply.code(500).send({
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+fastify.post<MonitorQuery>(
+  "/infra/monitor",
+  async (request: FastifyRequest<MonitorQuery>, reply: FastifyReply) => {
+    try {
+      const result = await checkInfrastructure();
+      const notify = request.query?.notify ?? "issues";
+
+      if (notify === "true") {
+        await sendFullReport(result);
+      } else if (notify === "issues") {
+        await sendIssueAlert(result);
+      }
+
+      reply.code(200).send(result);
+    } catch (error) {
+      reply.code(500).send({
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   }
-});
+);
 
 interface ServiceParams {
   Params: { service: string };
