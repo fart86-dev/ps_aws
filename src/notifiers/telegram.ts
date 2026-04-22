@@ -1,16 +1,12 @@
+import { Notifier } from "./types";
 import { InfraMonitorResult } from "../types";
 
-const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.CHAT_ID;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 async function sendMessage(message: string): Promise<boolean> {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.warn("Telegram credentials not configured");
-    return false;
-  }
-
   try {
     const response = await fetch(`${TELEGRAM_API_URL}/sendMessage`, {
       method: "POST",
@@ -69,7 +65,10 @@ function formatDynamoDBMetrics(result: InfraMonitorResult): string {
   let text = "📊 <b>DynamoDB 메트릭</b>\n";
   result.dynamodb.forEach((metric) => {
     const statusEmoji = metric.status === "ACTIVE" ? "✅" : "⚠️";
-    const errorEmoji = metric.userErrors.value > 10 || metric.systemErrors.value > 0 ? "⚠️" : "✅";
+    const errorEmoji =
+      metric.userErrors.value > 10 || metric.systemErrors.value > 0
+        ? "⚠️"
+        : "✅";
 
     text += `${statusEmoji} <b>${metric.tableName}</b>\n`;
     text += `  Status: ${metric.status}\n`;
@@ -113,34 +112,42 @@ function formatIssues(result: InfraMonitorResult): string {
   return text + "\n";
 }
 
-export async function sendFullReport(result: InfraMonitorResult): Promise<boolean> {
-  const timestamp = new Date().toLocaleString("ko-KR");
+export const telegramNotifier: Notifier = {
+  name: "Telegram",
 
-  let message = `📌 <b>AWS 인프라 점검 결과</b>\n`;
-  message += `시간: ${timestamp}\n`;
-  message += `총 확인: ${result.summary.totalChecked}개 서비스\n\n`;
+  isConfigured(): boolean {
+    return !!TELEGRAM_BOT_TOKEN && !!TELEGRAM_CHAT_ID;
+  },
 
-  message += formatRDSMetrics(result);
-  message += formatDynamoDBMetrics(result);
-  message += formatWAFMetrics(result);
-  message += formatIssues(result);
+  async sendFullReport(result: InfraMonitorResult): Promise<boolean> {
+    const timestamp = new Date().toLocaleString("ko-KR");
 
-  return sendMessage(message);
-}
+    let message = `📌 <b>AWS 인프라 점검 결과</b>\n`;
+    message += `시간: ${timestamp}\n`;
+    message += `총 확인: ${result.summary.totalChecked}개 서비스\n\n`;
 
-export async function sendIssueAlert(result: InfraMonitorResult): Promise<boolean> {
-  if (result.summary.issuesFound.length === 0) {
-    return true;
-  }
+    message += formatRDSMetrics(result);
+    message += formatDynamoDBMetrics(result);
+    message += formatWAFMetrics(result);
+    message += formatIssues(result);
 
-  const timestamp = new Date().toLocaleString("ko-KR");
+    return sendMessage(message);
+  },
 
-  let message = `🚨 <b>AWS 인프라 이슈 감지</b>\n`;
-  message += `시간: ${timestamp}\n\n`;
+  async sendIssueAlert(result: InfraMonitorResult): Promise<boolean> {
+    if (result.summary.issuesFound.length === 0) {
+      return true;
+    }
 
-  result.summary.issuesFound.forEach((issue) => {
-    message += `⚠️ ${issue}\n`;
-  });
+    const timestamp = new Date().toLocaleString("ko-KR");
 
-  return sendMessage(message);
-}
+    let message = `🚨 <b>AWS 인프라 이슈 감지</b>\n`;
+    message += `시간: ${timestamp}\n\n`;
+
+    result.summary.issuesFound.forEach((issue) => {
+      message += `⚠️ ${issue}\n`;
+    });
+
+    return sendMessage(message);
+  },
+};

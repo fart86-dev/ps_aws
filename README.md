@@ -23,12 +23,12 @@ yarn start
 
 ## API 엔드포인트
 
-- `GET /health` - 서버 상태 확인
+- `GET /health` - 서버 상태 확인 (설정된 알림 채널 표시)
 - `POST /infra/monitor?notify=issues` - 전체 인프라 점검 (RDS, DynamoDB, WAF)
-  - `?notify=issues` (기본값) - 문제 발생 시만 텔레그램 알림
-  - `?notify=true` - 전체 리포트를 텔레그램으로 전송
-  - `?notify=false` - 텔레그램 알림 없음
-- `GET /infra/monitor/:service` - 특정 서비스 메트릭 조회 (:service = rds, dynamodb, waf)
+  - `?notify=issues` (기본값) - 문제 발생 시만 알림 (Telegram/Slack 모두)
+  - `?notify=true` - 전체 리포트 전송 (Telegram/Slack 모두)
+  - `?notify=false` - 알림 없음
+- `GET /infra/monitor/:service` - 특정 서비스 메트릭 조회 (:service = rds, dynamodb, waf, 알림 없음)
 
 ## 구조
 
@@ -39,6 +39,11 @@ src/
 │   ├── dynamodb.ts     - DynamoDB 모니터링
 │   ├── waf.ts          - WAF 모니터링
 │   └── index.ts        - 통합 모니터링 로직
+├── notifiers/
+│   ├── types.ts        - Notifier 인터페이스
+│   ├── telegram.ts     - Telegram 알림 구현
+│   ├── slack.ts        - Slack 알림 구현
+│   └── index.ts        - 통합 알림 발송
 ├── server.ts           - Fastify 서버
 ├── types.ts            - TypeScript 타입 정의
 └── index.ts            - 진입점
@@ -46,12 +51,21 @@ src/
 
 ## 환경 설정
 
-**.env 파일:**
+**.env 파일 (선택사항):**
+
+Telegram 알림:
 ```
-BOT_TOKEN=your_telegram_bot_token
-CHAT_ID=your_telegram_chat_id
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_CHAT_ID=your_telegram_chat_id
 ```
 
+Slack 알림:
+```
+SLACK_BOT_TOKEN=your_slack_bot_token
+SLACK_CHANNEL_ID=your_slack_channel_id
+```
+
+AWS 자격증명:
 AWS SDK는 기본 AWS 자격증명을 사용합니다 (AWS_PROFILE, ~/.aws/credentials 등)
 
 ## 점검 항목

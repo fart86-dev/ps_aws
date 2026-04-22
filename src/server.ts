@@ -1,6 +1,10 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import { checkInfrastructure, monitorRDS, monitorDynamoDB, monitorWAF } from "./infra-monitor";
-import { sendIssueAlert, sendFullReport } from "./telegram/notifier";
+import {
+  sendIssueAlert,
+  sendFullReport,
+  listConfiguredNotifiers,
+} from "./notifiers";
 
 const fastify = Fastify({
   logger: true,
@@ -17,7 +21,10 @@ interface MonitorQuery {
 }
 
 fastify.get("/health", async () => {
-  return { status: "ok" };
+  return {
+    status: "ok",
+    notifiers: listConfiguredNotifiers(),
+  };
 });
 
 fastify.post<MonitorQuery>(
