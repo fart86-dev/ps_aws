@@ -1,10 +1,15 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
-import { checkInfrastructure } from "./infra-monitor";
-import type { InfraMonitorResult } from "./types";
+import { checkInfrastructure, monitorRDS, monitorDynamoDB, monitorWAF } from "./infra-monitor";
 
 const fastify = Fastify({
   logger: true,
 });
+
+const serviceMonitors = {
+  rds: monitorRDS,
+  dynamodb: monitorDynamoDB,
+  waf: monitorWAF,
+} as const;
 
 fastify.get("/health", async () => {
   return { status: "ok" };
@@ -30,17 +35,17 @@ fastify.get<ServiceParams>(
   async (request: FastifyRequest<ServiceParams>, reply: FastifyReply) => {
     try {
       const { service } = request.params;
-      const validServices = ["rds", "dynamodb", "waf"] as const;
+      const validServices = Object.keys(serviceMonitors);
 
-      if (!validServices.includes(service as any)) {
+      if (!validServices.includes(service)) {
         return reply.code(400).send({
           error: "Invalid service",
           available: validServices,
         });
       }
 
-      const result = await checkInfrastructure();
-      const data = result[service as keyof InfraMonitorResult];
+      const monitor = serviceMonitors[service as keyof typeof serviceMonitors];
+      const data = await monitor();
 
       reply.code(200).send(data);
     } catch (error) {
