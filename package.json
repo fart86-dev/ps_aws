@@ -6,9 +6,12 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:bg": "nohup tsx src/index.ts > app.log 2>&1 &",
     "build": "tsc",
     "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "start:bg": "nohup node dist/index.js > app.log 2>&1 &",
+    "type-check": "tsc --noEmit",
+    "logs": "tail -f app.log"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.614.0",

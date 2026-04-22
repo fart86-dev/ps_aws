@@ -6,19 +6,33 @@ RDS, DynamoDB, WAF 인프라 점검 기능을 제공하는 Fastify 기반 모니
 
 ```bash
 yarn install
+cp .env.example .env  # 환경변수 설정 파일 복사
 ```
 
-## 개발 실행
+## 실행 방법
 
+### 개발 모드 (포그라운드)
 ```bash
 yarn dev
 ```
 
-## 프로덕션 빌드
+### 개발 모드 (백그라운드 - 권장)
+```bash
+yarn dev:bg
+yarn logs  # 로그 보기
+```
 
+### 프로덕션 모드
 ```bash
 yarn build
 yarn start
+```
+
+### 프로덕션 모드 (백그라운드)
+```bash
+yarn build
+yarn start:bg
+yarn logs  # 로그 보기
 ```
 
 ## API 엔드포인트
