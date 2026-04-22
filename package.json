@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "start:bg": "bash scripts/start-bg.sh",
-    "stop": "if [ -f .pid ]; then kill $(cat .pid) 2>/dev/null && rm .pid && echo 'Server stopped'; else echo 'No server running'; fi",
+    "stop": "bash scripts/stop.sh",
     "type-check": "tsc --noEmit",
     "logs": "tail -f app.log"
   },
