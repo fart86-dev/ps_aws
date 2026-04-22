@@ -25,9 +25,7 @@ yarn start
 
 - `GET /health` - 서버 상태 확인
 - `POST /infra/monitor` - 전체 인프라 점검 (RDS, DynamoDB, WAF)
-- `GET /infra/monitor/rds` - RDS 메트릭만 조회
-- `GET /infra/monitor/dynamodb` - DynamoDB 메트릭만 조회
-- `GET /infra/monitor/waf` - WAF 메트릭만 조회
+- `GET /infra/monitor/:service` - 특정 서비스 메트릭 조회 (:service = rds, dynamodb, waf)
 
 ## 구조
 
