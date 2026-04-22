@@ -5,6 +5,7 @@ import {
   sendFullReport,
   listConfiguredNotifiers,
 } from "./notifiers";
+import { startScheduler, stopScheduler, isSchedulerRunning } from "./scheduler";
 
 const fastify = Fastify({
   logger: true,
@@ -24,6 +25,11 @@ fastify.get("/health", async () => {
   return {
     status: "ok",
     notifiers: listConfiguredNotifiers(),
+    scheduler: {
+      running: isSchedulerRunning(),
+      schedule: process.env.CRON_SCHEDULE || "*/30 * * * *",
+      notifyMode: process.env.NOTIFY_MODE || "issues",
+    },
   };
 });
 
@@ -79,10 +85,26 @@ fastify.get<ServiceParams>(
   }
 );
 
-export async function startServer(port: number = 3000) {
+export async function startServer(port: number = 3000, enableScheduler: boolean = true) {
   try {
     await fastify.listen({ port, host: "0.0.0.0" });
     console.log(`Server listening on port ${port}`);
+
+    if (enableScheduler) {
+      startScheduler();
+    }
+
+    const shutdown = () => {
+      console.log("Shutting down...");
+      stopScheduler();
+      fastify.close(() => {
+        console.log("Server closed");
+        process.exit(0);
+      });
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
   } catch (error) {
     fastify.log.error(error);
     process.exit(1);
