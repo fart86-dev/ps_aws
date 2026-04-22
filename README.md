@@ -91,6 +91,7 @@ SLACK_CHANNEL_ID=your_slack_channel_id
 ```
 CRON_SCHEDULE=*/30 * * * *    # Cron 표현식 (기본값: 30분마다)
 NOTIFY_MODE=issues            # 알림 모드: issues, full, none (기본값: issues)
+RDS_INSTANCE_NAMES=production-mshuttle,production-mshuttle-read1  # 모니터링할 RDS 인스턴스 (선택사항, 미지정 시 모두)
 ```
 
 AWS 자격증명:

@@ -49,10 +49,18 @@ export async function monitorRDS(): Promise<RDSMetrics[]> {
   const response = await rdsClient.send(command);
 
   const instances = response.DBInstances || [];
+  const targetInstances = process.env.RDS_INSTANCE_NAMES
+    ? process.env.RDS_INSTANCE_NAMES.split(",").map((name) => name.trim())
+    : null;
+
   const metrics: RDSMetrics[] = [];
 
   for (const instance of instances) {
     const instanceId = instance.DBInstanceIdentifier || "";
+
+    if (targetInstances && !targetInstances.includes(instanceId)) {
+      continue;
+    }
 
     const [cpuData, connData] = await Promise.all([
       getMetricData("CPUUtilization", instanceId),
