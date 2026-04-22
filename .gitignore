@@ -3,6 +3,8 @@ dist/
 .env
 .env.local
 .env*.local
+.pid
+app.log
 *.log
 npm-debug.log*
 yarn-error.log*

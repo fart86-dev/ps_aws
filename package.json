@@ -6,10 +6,11 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "dev:bg": "nohup tsx src/index.ts > app.log 2>&1 &",
+    "dev:bg": "nohup tsx src/index.ts > app.log 2>&1 & echo $! > .pid",
     "build": "tsc",
     "start": "node dist/index.js",
-    "start:bg": "nohup node dist/index.js > app.log 2>&1 &",
+    "start:bg": "nohup node dist/index.js > app.log 2>&1 & echo $! > .pid",
+    "stop": "if [ -f .pid ]; then kill $(cat .pid) 2>/dev/null && rm .pid && echo 'Server stopped'; else echo 'No server running'; fi",
     "type-check": "tsc --noEmit",
     "logs": "tail -f app.log"
   },

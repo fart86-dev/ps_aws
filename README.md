@@ -20,6 +20,7 @@ yarn dev
 ```bash
 yarn dev:bg
 yarn logs  # 로그 보기
+yarn stop  # 종료
 ```
 
 ### 프로덕션 모드
@@ -33,6 +34,7 @@ yarn start
 yarn build
 yarn start:bg
 yarn logs  # 로그 보기
+yarn stop  # 종료
 ```
 
 ## API 엔드포인트
