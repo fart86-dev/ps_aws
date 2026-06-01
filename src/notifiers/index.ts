@@ -1,7 +1,7 @@
 import { Notifier } from "./types";
-import { telegramNotifier } from "./telegram";
+import { telegramNotifier, sendWasteReportToTelegram } from "./telegram";
 import { slackNotifier } from "./slack";
-import { InfraMonitorResult } from "../types";
+import { InfraMonitorResult, WasteReport } from "../types";
 
 const allNotifiers: Notifier[] = [telegramNotifier, slackNotifier];
 
@@ -83,4 +83,26 @@ export async function sendIssueAlert(result: InfraMonitorResult): Promise<void> 
 
 export function listConfiguredNotifiers(): string[] {
   return getActiveNotifiers().map((n) => n.name);
+}
+
+/**
+ * Waste report 알림. Telegram만 지원 (보고서 형식 특화).
+ * Telegram 미설정 시 console에만 출력.
+ */
+export async function sendWasteReport(
+  report: WasteReport,
+  options: { onlyIfItems?: boolean } = {}
+): Promise<void> {
+  if (options.onlyIfItems && report.items.length === 0) {
+    console.log("[waste] no items — skip alert");
+    return;
+  }
+  const success = await sendWasteReportToTelegram(report);
+  if (success) {
+    console.log(
+      `✅ Telegram waste report sent (${report.items.length} items, ~$${report.totalEstimatedSavingsUSD.toFixed(2)}/월)`
+    );
+  } else {
+    console.error("❌ Telegram waste report 전송 실패 (또는 미설정)");
+  }
 }

@@ -1,8 +1,10 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import { checkInfrastructure, monitorRDS, monitorDynamoDB, monitorWAF } from "./infra-monitor";
+import { collectWaste } from "./infra-monitor/waste";
 import {
   sendIssueAlert,
   sendFullReport,
+  sendWasteReport,
   listConfiguredNotifiers,
 } from "./notifiers";
 import { startScheduler, stopScheduler, isSchedulerRunning } from "./scheduler";
@@ -47,6 +49,28 @@ fastify.post<MonitorQuery>(
       }
 
       reply.code(200).send(result);
+    } catch (error) {
+      reply.code(500).send({
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+);
+
+interface WasteQuery {
+  Querystring: { notify?: "true" | "false" };
+}
+
+fastify.get<WasteQuery>(
+  "/infra/waste",
+  async (request: FastifyRequest<WasteQuery>, reply: FastifyReply) => {
+    try {
+      const report = await collectWaste();
+      const notify = request.query?.notify ?? "false";
+      if (notify === "true") {
+        await sendWasteReport(report);
+      }
+      reply.code(200).send(report);
     } catch (error) {
       reply.code(500).send({
         error: error instanceof Error ? error.message : "Unknown error",

@@ -20,6 +20,7 @@
     "@aws-sdk/client-cloudwatch": "^3.614.0",
     "@aws-sdk/client-cost-explorer": "^3.1057.0",
     "@aws-sdk/client-dynamodb": "^3.614.0",
+    "@aws-sdk/client-ec2": "^3.1057.0",
     "@aws-sdk/client-rds": "^3.614.0",
     "@aws-sdk/client-wafv2": "^3.614.0",
     "dotenv": "^16.4.5",

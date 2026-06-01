@@ -1,5 +1,5 @@
 import { Notifier } from "./types";
-import { InfraMonitorResult } from "../types";
+import { InfraMonitorResult, WasteReport, WasteCategory } from "../types";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -151,3 +151,63 @@ export const telegramNotifier: Notifier = {
     return sendMessage(message);
   },
 };
+
+const CATEGORY_LABEL: Record<WasteCategory, string> = {
+  "stopped-ec2": "🛑 Stopped EC2",
+  "idle-eip": "💸 Idle EIP",
+  "unattached-ebs": "💾 Unattached EBS",
+  "unattached-eni": "🔌 Unattached ENI",
+  "old-snapshot": "🗄️ Old Snapshot",
+  "rds-storage-waste": "📦 RDS Storage 낭비",
+  "rds-storage-gp2": "⬆️ RDS gp2 → gp3",
+  "rds-replica-cross-az": "🔁 RDS Replica Cross-AZ",
+};
+
+export async function sendWasteReportToTelegram(
+  report: WasteReport
+): Promise<boolean> {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.log(`[waste] Telegram 미설정 — 콘솔 출력만:`);
+    console.log(JSON.stringify(report, null, 2));
+    return false;
+  }
+
+  const timestamp = report.timestamp.toLocaleString("ko-KR");
+  let message = `🧹 <b>AWS Waste 점검</b>\n`;
+  message += `시간: ${timestamp}\n`;
+  message += `리전: ${report.region}\n`;
+  message += `발견 항목: ${report.items.length}건\n`;
+  message += `예상 절감: ~$${report.totalEstimatedSavingsUSD.toFixed(2)}/월\n\n`;
+
+  if (report.items.length === 0) {
+    message += `✅ 잔재 없음 — 깔끔합니다`;
+    return sendMessage(message);
+  }
+
+  // 카테고리별 그룹화
+  const grouped = new Map<WasteCategory, typeof report.items>();
+  for (const item of report.items) {
+    if (!grouped.has(item.category)) grouped.set(item.category, []);
+    grouped.get(item.category)!.push(item);
+  }
+
+  for (const [cat, items] of grouped) {
+    const catCost = items.reduce(
+      (s, it) => s + it.estimatedMonthlySavingUSD,
+      0
+    );
+    message += `<b>${CATEGORY_LABEL[cat]}</b> (${items.length}건`;
+    if (catCost > 0) message += `, ~$${catCost.toFixed(2)}/월`;
+    message += `)\n`;
+    for (const item of items.slice(0, 5)) {
+      const label = item.name ? `${item.resourceId} (${item.name})` : item.resourceId;
+      message += `  • <code>${label}</code> — ${item.detail}\n`;
+    }
+    if (items.length > 5) {
+      message += `  ...외 ${items.length - 5}건\n`;
+    }
+    message += `\n`;
+  }
+
+  return sendMessage(message);
+}

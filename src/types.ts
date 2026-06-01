@@ -39,3 +39,30 @@ export interface InfraMonitorResult {
     issuesFound: string[];
   };
 }
+
+export type WasteCategory =
+  | "stopped-ec2"
+  | "idle-eip"
+  | "unattached-ebs"
+  | "unattached-eni"
+  | "old-snapshot"
+  | "rds-storage-waste"
+  | "rds-storage-gp2"
+  | "rds-replica-cross-az";
+
+export interface WasteItem {
+  category: WasteCategory;
+  resourceId: string;
+  name?: string;
+  detail: string;
+  estimatedMonthlySavingUSD: number;
+  severity: "info" | "warn";
+}
+
+export interface WasteReport {
+  timestamp: Date;
+  region: string;
+  items: WasteItem[];
+  totalEstimatedSavingsUSD: number;
+  totals: Record<WasteCategory, number>;
+}
