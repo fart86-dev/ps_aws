@@ -66,3 +66,5 @@ export interface WasteReport {
   totalEstimatedSavingsUSD: number;
   totals: Record<WasteCategory, number>;
 }
+
+//
