@@ -12,7 +12,8 @@
     "start:bg": "bash scripts/start-bg.sh",
     "stop": "bash scripts/stop.sh",
     "type-check": "tsc --noEmit",
-    "logs": "tail -f app.log"
+    "logs": "tail -f app.log",
+    "waf:bot": "tsx src/scripts/wafBotControl.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.614.0",
