@@ -13,10 +13,12 @@
     "stop": "bash scripts/stop.sh",
     "type-check": "tsc --noEmit",
     "logs": "tail -f app.log",
-    "waf:bot": "tsx src/scripts/wafBotControl.ts"
+    "waf:bot": "tsx src/scripts/wafBotControl.ts",
+    "rds:status": "tsx src/scripts/rdsStatus.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.614.0",
+    "@aws-sdk/client-cost-explorer": "^3.1057.0",
     "@aws-sdk/client-dynamodb": "^3.614.0",
     "@aws-sdk/client-rds": "^3.614.0",
     "@aws-sdk/client-wafv2": "^3.614.0",
