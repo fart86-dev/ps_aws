@@ -164,11 +164,78 @@ ap-northeast-2 region에서 KMS 키 21개 발견. 초기 추정 "월 $21 절감 
 
 ---
 
+## 2026-06-03
+
+### production-mshuttle-read1 AZ 이동 (cross-AZ 비용 제거)
+
+#### 배경
+ps_aws의 `pnpm rds:status`가 띄운 finding 2종을 해소하는 작업.
+- `REPLICA_CROSS_AZ`: source(AZ-2c)와 read1(AZ-2a) 다른 AZ → inter-AZ data transfer 비용 발생
+- `STORAGE_WASTE`: read1 100GB 할당 / 11.5GB 사용 (11%)
+
+#### 메모리 계획 vs 실제 (AWS 제약 발견)
+| 절감 항목 | 메모리 계획 | 실제 가능 |
+|----------|------------|----------|
+| Cross-AZ data transfer 제거 | -$17.82/월 | ✅ -$17.82/월 |
+| Storage 75GB 축소 (100→25) | -$6.96/월 | ❌ 불가 (`allocated-storage`는 source 이상이어야 함) |
+| gp2→gp3 전환 | (계획에 포함) | ❌ 이미 gp3였음 (오해) |
+| **합계** | **-$24.78/월** | **-$17.82/월** (옵션 A 선택) |
+
+→ 옵션 A (cross-AZ만 해결, 100GB 유지) 진행. Storage 축소는 source 자체를 dump/restore로 줄여야 가능 → 별도 작업으로 분리.
+
+#### 사전 점검
+| 항목 | 결과 |
+|------|------|
+| source backup retention | 7일 ✅ (read replica 생성 prerequisite) |
+| source storage encryption | True (KMS 226af992 - aws/rds default) |
+| 옛 read1 활동 | DatabaseConnections 평균 2~3 / 피크 8 / ReadIOPS 평균 50 (활발) |
+| 작업 시간대 | 07:20 KST 오전 = 저트래픽 시간대 |
+| Parameter group | source `params-production-mysql84` → 새 replica가 자동 inherit |
+| Security Group | sg-a8fee9c1 동일 |
+
+#### 5단계 실행 결과
+| 단계 | 작업 | 시각 | 결과 |
+|------|------|------|------|
+| 1 | 새 replica 생성 (`production-mshuttle-read1-new`, AZ-2c, 100GB gp3) | 07:22~07:33 | ✅ 11분, parameter group `params-production-mysql84` 자동 inherit |
+| 2 | replica lag 확인 | 07:34 | ✅ 0초 |
+| 3 | rename: 옛 `read1` → `-old`, 새 `-new` → `read1` | 07:35~07:39 | ⚠️ waiter 함정으로 부분 실패 → 긴급 복구 |
+| 4 | 새 read1로 connection 정상 전환 확인 | 07:43 | ✅ 자동 (rename 후 4분) |
+| 5 | 옛 `-old` 삭제 (`--skip-final-snapshot --delete-automated-backups`) | 07:53~07:54 | ✅ 1분 38초 |
+
+총 소요: **약 32분**
+
+#### 운영 영향 (정직한 보고)
+- **read endpoint 부재 시간: 07:35 ~ 07:39 (약 3~4분)**
+- 메모리 예상 "~1분 끊김"보다 길었음
+- 그동안 앱의 read 쿼리는 DNS 실패 가능
+
+#### 원인 및 교훈
+- `aws rds wait db-instance-available`이 rename 직후 NotFound 응답에 **즉시 실패** (재시도 없음)
+- Step 3a wait 실패 → Step 3b가 첫 rename 완료 전 실행 → `DBInstanceAlreadyExists` 충돌
+- **교훈**: AWS rename + waiter 조합은 위험. waiter 대신 폴링 루프 (NotFound 재시도 포함) 사용 권장
+
+#### 옛 read1-old 잔존 connection 분석
+- rename 후 옛 -old에 1 connection 잔존 (운영 앱은 새 read1로 정상 전환됨)
+- 분석: 운영 코드는 `production-mshuttle-read1` hostname을 사용 → 새 인스턴스로 연결됨
+- 옛 인스턴스의 1 connection은 사람/agent가 옛 endpoint를 직접 알고 접속한 것 → 운영 영향 없음
+- → 옛 -old 즉시 삭제로 처리
+
+#### 확정 절감 효과
+- **-$17.82/월 (-$214/년)** — Inter-AZ Data Transfer 제거
+
+#### ps_aws 모니터링 finding 해소
+- `REPLICA_CROSS_AZ`: 해소 ✅
+- `STORAGE_WASTE`: 미해소 (source 축소 별도 작업 필요)
+
+### 후속 검토 대상 (추가)
+- **source `production-mshuttle` storage 축소**: 100GB → 25GB. dev-mshuttle과 동일한 dump/restore 방식 필요. read replica 100GB 제약도 함께 해소됨. 잠재 절감 -$6.96/월.
+
+---
+
 ## 진행 중인 TODO
 
 | 항목 | 기한 | 효과 |
 |------|------|------|
-| read replica AZ 이동 + 25GB | 2026-06-03 (수) 오전 | -$25/월 |
 | spd-test 체인 stop/삭제 결정 | 미정 | TBD |
 | dev-mshuttle 스토리지 마이그레이션 (수동) | 사용자 진행 | -$15/월 |
 | DataZone 도메인 Force Delete (콘솔) | 사용자 진행 | - |
@@ -176,3 +243,4 @@ ap-northeast-2 region에서 KMS 키 21개 발견. 초기 추정 "월 $21 절감 
 | slsv 버킷 `serverless/ussr/` prefix 정리 | 검토 후 진행 | -$0.15/월 |
 | KMS `test_key_1` schedule-key-deletion | 사용자 결정 후 | -$1/월 |
 | madmin KMS pending window 종료 모니터링 | 2026-07-02 | -$1/월 확정 |
+| production-mshuttle storage 축소 (dump/restore) | 별도 프로젝트 | -$6.96/월 |
