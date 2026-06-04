@@ -369,6 +369,68 @@ aws cloudwatch get-metric-statistics \
 ### 후속 검토 대상 (추가)
 - **msdeveloper 기타 prefix 일괄 정리**: error/, csv/, shp/, log/, test/, test1/, test2/, test3/, test_result/, user_log/, make/, makecode/, makep/, app/, cf_log/ — 사용자가 "사실상 삭제" 의향. 절감액은 미미($0.07/월)지만 객체 4,500+개 정리 가능. 사용자 확인 후 별도 작업.
 
+### CloudWatch API Gateway execution log 정리
+
+#### 배경
+S3 비용 정리 중 CloudWatch Logs도 점검. 사용자가 API Gateway execution log 그룹 2개 (`nswetbzg0b/dev`, `hrg3jdkzz4/dev`)의 원본 추적 요청.
+
+#### 1차 매칭 결과
+| 로그 그룹 | API Gateway | 상태 | 크기 | retention | 마지막 활동 |
+|-----------|-------------|------|------|-----------|-------------|
+| `API-Gateway-Execution-Logs_nswetbzg0b/dev` | **없음 (삭제된 API)** | 고아 | 164 MiB | 없음 | 2023-12-29 (2.4년 전) |
+| `API-Gateway-Execution-Logs_hrg3jdkzz4/dev` | `driver-app-restapi-dev` (CFN 스택) | 운영 중 | 117 MiB | 없음 | 2025-11-04 (7개월 전) |
+
+- `nswetbzg0b`: REST API/HTTP API 양쪽 모두 등록 없음 → 원본 API Gateway가 삭제된 상태
+- `hrg3jdkzz4`: driver 앱 dev 환경 API는 존재하나 7개월간 로그 없음
+
+#### dev vs production 비교 (`~/sl/ms_drapp_serv` 코드 점검)
+사용자 지적 — "production은 수집 안 하고 dev만 수집하는 경우가 어딨나" — 에 따라 양쪽 환경 정밀 비교.
+
+**`template.yaml` / `template.apigw.yaml` 코드 분석**:
+- 같은 SAM 템플릿으로 `STAGE` 파라미터만 다르게 dev/staging/production 배포
+- `MethodSettings.LoggingLevel: "OFF"` 명시 (모든 stage 공통)
+- `ExpressLambdaFunctionLogGroup`에 `RetentionInDays: 30` 명시
+- 즉 **template 차이는 없음 — 코드는 의도된 대로 작성됨**
+
+**실제 로그 그룹 현황**:
+| 채널 | dev | production | 분석 |
+|------|-----|------------|------|
+| Lambda 로그 (`/aws/lambda/...`) | 4.3 MB, 30일 retention, 어제 활동 | **223 MB, 30일 retention, 실시간 활동** | ✅ 정상 (production 트래픽 ≫ dev) |
+| API GW execution log | 117 MiB, retention 없음, 7개월 전 | **0 바이트, retention 없음** | ⚠️ dev만 비정상 |
+| stage `loggingLevel` (현재) | OFF | OFF | 동일 (template대로) |
+| stage `accessLogSettings` | null | null | 동일 |
+
+**결론**:
+- 실제 관찰 채널은 **Lambda 로그 그룹** — production은 정상적으로 53배 더 많이 누적 중
+- API Gateway execution log는 Lambda 로그와 중복이라 둘 다 OFF가 의도된 정상 상태
+- dev의 117 MiB는 **과거(2024-08-27 ~ 2025-11-04 사이) 누군가 콘솔에서 dev stage logging을 ON으로 켜둔 채 방치한 결과**. 이후 OFF로 되돌렸지만 retention 미설정이라 누적분이 영구 보관
+- production은 처음부터 한 번도 안 켜서 0 바이트
+
+#### 의사결정
+- `nswetbzg0b/dev` 삭제: 원본 API 없음, 2.4년 미사용
+- `hrg3jdkzz4/dev` 삭제: 운영에 영향 없음 (Lambda 로그가 모니터링 담당), 새 로그 없음
+- production execution log 그룹 (`dasrc5ygge/production`, 0 바이트): 그대로 둬도 비용 없음
+- template 수정 없음: 코드는 정상이고 문제는 운영 중 콘솔 조작에서 발생
+
+#### 적용
+```bash
+aws logs delete-log-group --log-group-name "API-Gateway-Execution-Logs_nswetbzg0b/dev"
+aws logs delete-log-group --log-group-name "API-Gateway-Execution-Logs_hrg3jdkzz4/dev"
+```
+
+#### 효과
+- 데이터 삭제: 164 MiB + 117 MiB = **281 MiB**
+- 비용 절감: ~$0.008/월 (CloudWatch Logs storage $0.03/GB-mo 기준, 미미)
+- 가치: 고아/잔재 리소스 제거, dev API logging 누적 방지
+
+#### 재발 방지 메모
+- 콘솔에서 dev stage logging을 임시로 켰다면 작업 후 **반드시 OFF로 되돌릴 것**
+- 또는 template에 API GW execution log group을 명시적으로 정의하고 retention 부여 (예: 7일) — 단, 자동 생성 그룹과 import 충돌 가능성 있어 작업 시 주의
+
+#### 후속 검토 대상
+- **다른 고아 로그 그룹 일괄 점검**: API-Gateway-Execution-Logs_* 외에 `/aws/codebuild/*`, `/aws/apigateway/*` 등에도 원본 없는 그룹 존재 가능. 별도 sweep 작업 필요
+- **retention 정책 일괄 적용**: 현재 거의 모든 로그 그룹이 retention 미설정 (무기한 누적). dev 환경은 7~30일, production은 90일 등 정책 결정 후 일괄 적용 검토
+
 ---
 
 ## 진행 중인 TODO
@@ -385,3 +447,5 @@ aws cloudwatch get-metric-statistics \
 | production-mshuttle storage 축소 (dump/restore) | 별도 프로젝트 | -$6.96/월 |
 | msdeveloper 기타 prefix 일괄 정리 (사용자 확인 후) | 검토 후 | -$0.07/월 (정리 가치) |
 | ~~msdeveloper 라이프사이클 적용 결과 확인~~ | ~~2026-06-06 이후~~ | **완료 (06-04, 8h 만에 99.6% 전환, -$114/월 확정)** |
+| CloudWatch 고아 로그 그룹 일괄 sweep (Lambda/CodeBuild 등) | 검토 후 | 정리 가치 |
+| CloudWatch Logs retention 정책 일괄 적용 (dev 7~30일, prod 90일) | 정책 결정 후 | TBD |
