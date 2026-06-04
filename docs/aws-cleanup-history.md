@@ -232,6 +232,120 @@ ps_aws의 `pnpm rds:status`가 띄운 finding 2종을 해소하는 작업.
 
 ---
 
+## 2026-06-04
+
+### msdeveloper S3 버킷 라이프사이클 정책 등록 (MySQL dump 자동 관리)
+
+#### 배경
+6월 초 정리 효과 점검 중, S3가 RDS 다음으로 큰 비용 항목($150/월)임을 확인. 45개 버킷 중 **`msdeveloper` 단독으로 전체 S3의 94%** 차지.
+
+#### 분석 결과
+| 항목 | 값 |
+|------|-----|
+| 버킷 총 용량 | 5,985 GB (5.84 TB) |
+| 객체 수 | 317,711개 |
+| 라이프사이클 정책 | **없음** (무한 누적 중) |
+| 스토리지 클래스 | 100% Standard |
+| Versioning | 미사용 |
+| 암호화 | AES256 |
+
+#### prefix별 용량 (상위)
+| Prefix | 객체 | 용량 | 월 비용 | 용도 |
+|--------|------|------|---------|------|
+| `db/` | 2,216 | **5,918 GB** | **$147.95** | 1시간마다 mosher MySQL dump (~2.7GB/개) |
+| `error/` | 1,726 | 1.78 GB | $0.045 | - |
+| `app/` | 11 | 0.35 GB | $0.009 | 앱 빌드 (.apk/.aab) |
+| 기타 13개 | ~4,800 | ~0.4 GB | <$0.02 | csv/shp/log/test 등 |
+
+→ db/가 사실상 전부. 다른 prefix 정리는 절감 효과 미미.
+
+#### 의사결정
+- dump 보관 정책: **30일 Standard → 90일 Glacier Flexible Retrieval → 120일 후 expire**
+- 다른 prefix는 이번 작업 범위에서 제외 (사용자 결정, 별도 정리 대상)
+- Glacier 최소 보관 90일 충족 → early deletion fee 회피
+- 분석 용도: 최근 30일은 즉시 액세스, 30일 이후는 1분~12시간 retrieval 가능
+
+#### 적용한 라이프사이클 정책
+```json
+{
+  "Rules": [{
+    "ID": "mysql-dump-tier-and-expire",
+    "Status": "Enabled",
+    "Filter": { "Prefix": "db/" },
+    "Transitions": [{ "Days": 30, "StorageClass": "GLACIER" }],
+    "Expiration": { "Days": 120 }
+  }]
+}
+```
+
+#### 적용 즉시 영향 (1-2일 내)
+| 객체 분류 | 수 | 용량 | 처리 |
+|-----------|-----|------|------|
+| < 30일 | 720 | 2,130 GB | Standard 유지 |
+| 30~90일 | 1,440 | 3,633 GB | → Glacier transition |
+| 90~120일 | 55 | 154 GB | → Glacier 후 27일 뒤 expire (~$2 early fee) |
+| > 120일 | 1 | 0 (2018년 placeholder) | 즉시 삭제 |
+
+#### 비용 변화 추정
+| 시점 | 구성 | 월 비용 |
+|------|------|---------|
+| 적용 전 | 5,918 GB × Standard, 라이프사이클 없음 (누적 중) | **$148+ ↑** |
+| 적용 1-2일 후 | 2,130 GB Std + 3,788 GB GFR | **~$67** (-$81) |
+| 정상 상태 (~5개월 후) | 1,950 GB Std + 5,850 GB GFR | **~$70** (-$78/월) |
+
+#### 1회성 비용
+- Transition request fee: 1,495개 × $0.00005 ≈ **$0.07**
+- Early deletion fee (90~120일 객체 55개): 약 **$1~2**
+
+#### 운영 영향
+- 새 dump 자동 적용: `db/` prefix에 추가되는 모든 신규 dump는 30일째 자동 Glacier 전환, 120일째 자동 삭제
+- 사람 개입: 정책 변경 시에만 필요
+- 분석 시 30일 이내 dump는 Standard에서 즉시 액세스, 30일 이후는 GFR retrieval 필요 (Standard 복원 요청 시 1분~12시간, 비용 $0.03/GB)
+
+#### Transition 타이밍 (라이프사이클 동작 원리)
+- S3 라이프사이클은 **매일 1회 자동 실행** (UTC 기준, 정확한 시각은 AWS 비공개)
+- 정책 등록 후 **24~48시간 이내** 첫 batch 처리 시작
+- 객체별 transition은 비동기. batch가 끝나도 모든 객체가 동시에 바뀌지 않음
+- 큰 batch는 며칠~1주 걸릴 수 있으나, 1,495개 객체면 보통 1~3일 내 완료
+
+##### 이번 적용 예상 일정
+| 시점 | 예상 상태 |
+|------|-----------|
+| 2026-06-04 (적용일) | 정책 등록 완료, 변화 없음 |
+| 2026-06-05 ~ 06 | 첫 batch 처리 시작 |
+| 2026-06-06 ~ 08 | 1,495개 객체(3.8 TB) 대부분 transition 완료 |
+| 2026-06-07 이후 | CloudWatch에서 storage class별 분포 확인 가능 |
+
+#### 후속 모니터링
+
+**1. 특정 객체 storage class 확인 (즉시 확인 가능, 가장 빠른 검증)**
+```bash
+aws s3api head-object --bucket msdeveloper \
+  --key db/2026-03-04_00:00:01.mosher.sql \
+  --query StorageClass
+# null/STANDARD → 며칠 후 GLACIER로 바뀌면 성공
+```
+
+**2. CloudWatch storage class별 용량 (24h 지연)**
+```bash
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/S3 --metric-name BucketSizeBytes \
+  --start-time 2026-06-05T00:00:00Z --end-time 2026-06-08T00:00:00Z \
+  --period 86400 --statistics Average \
+  --dimensions Name=BucketName,Value=msdeveloper Name=StorageType,Value=GlacierStorage \
+  --query 'Datapoints'
+# 0이 아닌 값이 나오면 transition 진행 중
+```
+
+**3. 6월 청구서**: S3 USAGE_TYPE 비교로 GFR 전환량 정량 확인 (`APN2-TimedStorage-GlacierByteHrs` 출현)
+
+**4. (선택) S3 Inventory**: 활성화 시 daily/weekly로 전체 객체 storage class 보고서 제공. 첫 보고서까지 24~48h.
+
+### 후속 검토 대상 (추가)
+- **msdeveloper 기타 prefix 일괄 정리**: error/, csv/, shp/, log/, test/, test1/, test2/, test3/, test_result/, user_log/, make/, makecode/, makep/, app/, cf_log/ — 사용자가 "사실상 삭제" 의향. 절감액은 미미($0.07/월)지만 객체 4,500+개 정리 가능. 사용자 확인 후 별도 작업.
+
+---
+
 ## 진행 중인 TODO
 
 | 항목 | 기한 | 효과 |
@@ -244,3 +358,5 @@ ps_aws의 `pnpm rds:status`가 띄운 finding 2종을 해소하는 작업.
 | KMS `test_key_1` schedule-key-deletion | 사용자 결정 후 | -$1/월 |
 | madmin KMS pending window 종료 모니터링 | 2026-07-02 | -$1/월 확정 |
 | production-mshuttle storage 축소 (dump/restore) | 별도 프로젝트 | -$6.96/월 |
+| msdeveloper 기타 prefix 일괄 정리 (사용자 확인 후) | 검토 후 | -$0.07/월 (정리 가치) |
+| msdeveloper 라이프사이클 적용 결과 확인 | 2026-06-06 이후 | 확인 |
