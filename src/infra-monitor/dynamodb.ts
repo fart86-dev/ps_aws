@@ -49,7 +49,14 @@ export async function monitorDynamoDB(): Promise<DynamoDBMetrics[]> {
   const listCommand = new ListTablesCommand({});
   const listResponse = await dynamodbClient.send(listCommand);
 
-  const tableNames = listResponse.TableNames || [];
+  const allTableNames = listResponse.TableNames || [];
+  const targetTables = process.env.DYNAMODB_TABLE_NAMES
+    ? process.env.DYNAMODB_TABLE_NAMES.split(",").map((name) => name.trim())
+    : null;
+
+  const tableNames = targetTables
+    ? allTableNames.filter((name) => targetTables.includes(name))
+    : allTableNames;
   const metrics: DynamoDBMetrics[] = [];
 
   for (const tableName of tableNames) {
