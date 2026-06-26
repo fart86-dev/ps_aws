@@ -5,36 +5,38 @@ RDS, DynamoDB, WAF 인프라 점검 기능을 제공하는 Fastify 기반 모니
 ## 설치
 
 ```bash
-yarn install
+pnpm install
 cp .env.example .env  # 환경변수 설정 파일 복사
 ```
+
+> 패키지 매니저는 **pnpm 고정**입니다 (`package.json`의 `packageManager` 필드 + `pnpm-lock.yaml`). yarn/npm 사용 금지.
 
 ## 실행 방법
 
 ### 개발 모드 (포그라운드)
 ```bash
-yarn dev
+pnpm dev
 ```
 
 ### 개발 모드 (백그라운드 - 권장)
 ```bash
-yarn dev:bg
-yarn logs  # 로그 보기
-yarn stop  # 종료
+pnpm dev:bg
+pnpm logs  # 로그 보기
+pnpm stop  # 종료
 ```
 
 ### 프로덕션 모드
 ```bash
-yarn build
-yarn start
+pnpm build
+pnpm start
 ```
 
 ### 프로덕션 모드 (백그라운드)
 ```bash
-yarn build
-yarn start:bg
-yarn logs  # 로그 보기
-yarn stop  # 종료
+pnpm build
+pnpm start:bg
+pnpm logs  # 로그 보기
+pnpm stop  # 종료
 ```
 
 ## API 엔드포인트
@@ -84,13 +86,13 @@ AWS 인프라 분석을 위한 쉘 스크립트를 제공합니다.
 
 ```bash
 # 기본값: 30분마다 실행
-CRON_SCHEDULE="*/30 * * * *" yarn start
+CRON_SCHEDULE="*/30 * * * *" pnpm start
 
 # 매시간 실행
-CRON_SCHEDULE="0 * * * *" yarn start
+CRON_SCHEDULE="0 * * * *" pnpm start
 
 # 매일 아침 9시 실행
-CRON_SCHEDULE="0 9 * * *" yarn start
+CRON_SCHEDULE="0 9 * * *" pnpm start
 ```
 
 스케줄러는 설정된 알림 채널(Telegram/Slack)로 `NOTIFY_MODE`에 따라 자동으로 보고서를 전송합니다:

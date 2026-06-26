@@ -1,25 +1,33 @@
-# dev-mshuttle RDS Storage 축소 마이그레이션 가이드
+---
+type: aws-runbook
+category: rds
+applies_to: [dev-mshuttle, production-mshuttle (참고용)]
+last_verified: 2026-06-01
+status: ready (수동 실행 대기)
+---
 
-## 목적
+# RDS storage 축소 마이그레이션 (dump/restore swap 방식)
 
-dev-mshuttle RDS의 storage를 **200 GB → 50 GB**로 줄여 월 **~$13** 비용 절감.
+RDS 는 storage **증가**만 가능하고 축소는 불가능. 따라서 작은 storage 의 새 인스턴스를 만들어 데이터를 옮기는 방식.
 
-RDS는 storage 증가만 가능하고 축소는 불가능. 따라서 작은 storage의 새 인스턴스를 만들어 데이터를 옮기는 방식.
+이 runbook 의 1차 대상은 **dev-mshuttle 200 GB → 50 GB** (월 ~$13 절감). 같은 절차로 production-mshuttle 100 GB → 25 GB 도 가능하지만 운영 DB 라 다른 고려사항 필요 (→ 마지막 [주의사항] 참조).
 
-## 현재 상태 (2026-06-01 기준)
+---
 
-| 항목 | 값 |
-|------|------|
+## 대상 인스턴스 현재 상태 (2026-06-01 기준)
+
+| 항목 | dev-mshuttle |
+|---|---|
 | Engine | MySQL 8.4.9 |
 | Class | db.t4g.small |
 | Storage | **200 GB gp3** (실제 사용 12.5 GB, 낭비율 94%) |
 | AZ / Multi-AZ | ap-northeast-2c / **단일 AZ** |
 | Master user | admin |
-| Endpoint | dev-mshuttle.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com:3306 |
+| Endpoint | `dev-mshuttle.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com:3306` |
 | Subnet Group | default |
-| Parameter Group | params-dev-mysql84 (커스텀) |
-| Option Group | default:mysql-8-4 |
-| Security Group | sg-a8fee9c1 (default) |
+| Parameter Group | `params-dev-mysql84` (커스텀) |
+| Option Group | `default:mysql-8-4` |
+| Security Group | `sg-a8fee9c1` (default) |
 | Backup Retention | 7일 |
 | Backup Window | 20:06~20:36 UTC (= 05:06~05:36 KST) |
 | Maintenance | 화 17:02~17:32 UTC (= 수 02:02~02:32 KST) |
@@ -30,12 +38,12 @@ RDS는 storage 증가만 가능하고 축소는 불가능. 따라서 작은 stor
 ## 비용 효과
 
 | 항목 | 변경 전 | 변경 후 | 절감 |
-|------|------|------|------|
+|---|---|---|---|
 | Storage 200GB gp3 | ~$18/월 | ~$5/월 (50GB) | -$13/월 |
-| 인스턴스 시간 | start된 시간만 부과 | 동일 | 변동 없음 |
+| 인스턴스 시간 | start 된 시간만 부과 | 동일 | 변동 없음 |
 | 연간 효과 | | | **-$156/년** |
 
-> 별도 비용: final snapshot 보관(보관 기간 동안 ~$10/월), 일정 기간 후 정리.
+> 별도 비용: final snapshot 보관 (보관 기간 동안 ~$10/월), 일정 기간 후 정리.
 
 ---
 
@@ -59,22 +67,23 @@ flowchart TD
 
 ## 사전 준비
 
-### 1. 작업 도구
+### 1) 작업 도구
 - mysqldump, mysql 클라이언트 (MySQL 8.x)
-- 작업 위치: mshuttle EC2 (같은 VPC, RDS와 통신 빠름) 또는 로컬
-- mshuttle EC2 사용 권장 (방화벽 통과 / 네트워크 안정)
+- 작업 위치: mshuttle EC2 (같은 VPC, RDS 와 통신 빠름) 또는 로컬
+- **mshuttle EC2 사용 권장** (방화벽 통과 / 네트워크 안정)
 
-### 2. master 비밀번호 확보
-AWS Secrets Manager에 저장되어 있다면:
+### 2) master 비밀번호 확보
+AWS Secrets Manager 에 저장되어 있다면:
 ```bash
-aws secretsmanager get-secret-value --region ap-northeast-2 --secret-id <ARN> --query SecretString
+aws secretsmanager get-secret-value --region ap-northeast-2 \
+  --secret-id <ARN> --query SecretString
 ```
 
-저장된 게 없다면 다음 단계의 modify로 비밀번호 재설정 필요.
+저장된 게 없다면 다음 단계의 modify 로 비밀번호 재설정 필요.
 
-### 3. 백업 보관 공간
+### 3) 백업 보관 공간
 - dump 파일 ~12.5 GB + 압축 시 ~2~3 GB
-- mshuttle EC2의 EBS 여유 공간 충분 (20GB 중 사용 12.5GB 외 여유)
+- mshuttle EC2 의 EBS 여유 공간 충분 (20GB 중 사용 12.5GB 외 여유)
 
 ---
 
@@ -91,7 +100,7 @@ aws rds wait db-instance-available --region $REGION --db-instance-identifier dev
 
 ### Step 2. 새 인스턴스 생성 (50 GB)
 
-옛 인스턴스와 동일 설정 + storage만 50GB. **이름은 `dev-mshuttle-new`**.
+옛 인스턴스와 동일 설정 + storage 만 50GB. **이름은 `dev-mshuttle-new`**.
 
 ```bash
 aws rds create-db-instance --region $REGION \
@@ -128,9 +137,9 @@ aws rds wait db-instance-available --region $REGION --db-instance-identifier dev
 >   --target-db-parameter-group-description "Copy for dev-mshuttle migration"
 > ```
 
-### Step 3. mysqldump로 데이터 추출
+### Step 3. mysqldump 로 데이터 추출
 
-mshuttle EC2에서 (또는 로컬에서) 실행:
+mshuttle EC2 에서 (또는 로컬에서) 실행:
 
 ```bash
 OLD_HOST=dev-mshuttle.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com
@@ -142,7 +151,7 @@ mysql -h $OLD_HOST -u admin -p"$ADMIN_PW" \
   -e "SHOW DATABASES;" \
   | grep -Ev "Database|information_schema|mysql|performance_schema|sys"
 
-# 사용자 DB만 추출 (위 결과로 DB 이름 채워서)
+# 사용자 DB 만 추출 (위 결과로 DB 이름 채워서)
 mysqldump -h $OLD_HOST -u admin -p"$ADMIN_PW" \
   --single-transaction --routines --triggers --events \
   --set-gtid-purged=OFF \
@@ -156,13 +165,13 @@ ls -lh $DUMP
 - `--single-transaction`: InnoDB consistent snapshot, 무락
 - `--routines --triggers --events`: stored procedure / trigger / event 포함
 - `--set-gtid-purged=OFF`: RDS 간 import 시 호환성
-- `--databases`: 사용자 DB만 (mysql, sys 등 시스템 DB 제외)
+- `--databases`: 사용자 DB 만 (mysql, sys 등 시스템 DB 제외)
 
 ### Step 4. 새 인스턴스에 import
 
 ```bash
 NEW_HOST=dev-mshuttle-new.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com
-NEW_PW='<Step 2에서 정한 임시 비밀번호>'
+NEW_PW='<Step 2 에서 정한 임시 비밀번호>'
 
 gunzip < $DUMP | mysql -h $NEW_HOST -u admin -p"$NEW_PW"
 ```
@@ -172,7 +181,7 @@ import 시간: 12.5 GB 기준 약 10~20분.
 ### Step 5. 검증
 
 ```bash
-# 5-1. 테이블 개수 비교 (각 DB별)
+# 5-1. 테이블 개수 비교 (각 DB 별)
 for DB in <db1> <db2> ...; do
   OLD=$(mysql -h $OLD_HOST -u admin -p"$ADMIN_PW" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB'")
   NEW=$(mysql -h $NEW_HOST -u admin -p"$NEW_PW"  -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB'")
@@ -186,17 +195,17 @@ mysql -h $OLD_HOST -u admin -p"$ADMIN_PW" -e "
   WHERE table_schema NOT IN ('information_schema','mysql','performance_schema','sys')
   ORDER BY table_rows DESC LIMIT 20;
 "
-# 같은 query를 새 인스턴스에서도 실행해 결과 비교
+# 같은 query 를 새 인스턴스에서도 실행해 결과 비교
 
 # 5-3. routine/trigger 개수
 mysql -h $OLD_HOST -u admin -p"$ADMIN_PW" -e "SELECT COUNT(*) FROM information_schema.routines;"
 mysql -h $NEW_HOST -u admin -p"$NEW_PW"  -e "SELECT COUNT(*) FROM information_schema.routines;"
 
-# 5-4. 사용자 연결 점검 (애플리케이션이 연결되는지 mshuttle EC2에서 dryrun)
+# 5-4. 사용자 연결 점검
 mysql -h $NEW_HOST -u admin -p"$NEW_PW" -e "SELECT VERSION();"
 ```
 
-검증 OK가 아니면 **Step 8 롤백**으로.
+검증 OK 가 아니면 **Step 8 롤백**으로.
 
 ### Step 6. master 비밀번호 일치시키기 (옛 거와 동일하게)
 
@@ -214,6 +223,7 @@ aws rds wait db-instance-available --region $REGION --db-instance-identifier dev
 ### Step 7. 전환 (rename swap)
 
 ⚠️ 이 단계 중 DB 접근 불가 시간 발생 가능 (~5분). 사용 안 하는 시점에 진행.
+⚠️ **AWS rds wait + rename 직후 NotFound 함정** ([[../gotchas]] 참조). 운영 인스턴스에 적용 시 waiter 대신 폴링 루프 권장.
 
 ```bash
 # 7-1. 옛 거 rename: dev-mshuttle → dev-mshuttle-old
@@ -223,6 +233,7 @@ aws rds modify-db-instance --region $REGION \
   --apply-immediately
 
 aws rds wait db-instance-available --region $REGION --db-instance-identifier dev-mshuttle-old
+# ↑ dev 는 단순화. production 에서는 폴링 루프 사용.
 
 # 7-2. 새 거 rename: dev-mshuttle-new → dev-mshuttle
 aws rds modify-db-instance --region $REGION \
@@ -233,21 +244,21 @@ aws rds modify-db-instance --region $REGION \
 aws rds wait db-instance-available --region $REGION --db-instance-identifier dev-mshuttle
 ```
 
-rename 후 endpoint DNS는 동일 (`dev-mshuttle.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com`)이지만 실제 IP는 새 인스턴스 IP로 바뀜. DNS TTL ~60초 이내 자동 전환.
+rename 후 endpoint DNS 는 동일 (`dev-mshuttle.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com`) 이지만 실제 IP 는 새 인스턴스 IP 로 바뀜. DNS TTL ~60초 이내 자동 전환.
 
 ### Step 8. 옛 인스턴스 final snapshot + 삭제
 
 전환 후 7일 정도 안정성 검증 → 옛 인스턴스 최종 정리:
 
 ```bash
-# 7일 후 검증 OK면
+# 7일 후 검증 OK 면
 aws rds delete-db-instance --region $REGION \
   --db-instance-identifier dev-mshuttle-old \
   --final-db-snapshot-identifier dev-mshuttle-final-2026-06 \
   --no-skip-final-snapshot
 ```
 
-`final-db-snapshot-identifier`의 스냅샷은 storage 사이즈만큼 ~$10/월 보관 비용 발생. **일정 기간 후 직접 삭제 필요**:
+`final-db-snapshot-identifier` 의 스냅샷은 storage 사이즈만큼 ~$10/월 보관 비용 발생. **일정 기간 후 직접 삭제 필요**:
 
 ```bash
 # 보관 6개월 후 정도
@@ -261,7 +272,7 @@ aws rds delete-db-snapshot --region $REGION --db-snapshot-identifier dev-mshuttl
 검증 실패 또는 전환 후 문제 발견:
 
 ```bash
-# 새 거를 다시 dev-mshuttle-new로 되돌리고
+# 새 거를 다시 dev-mshuttle-bad 로 되돌리고
 aws rds modify-db-instance --region $REGION \
   --db-instance-identifier dev-mshuttle \
   --new-db-instance-identifier dev-mshuttle-bad \
@@ -274,14 +285,14 @@ aws rds modify-db-instance --region $REGION \
   --apply-immediately
 ```
 
-이후 dev-mshuttle-bad는 원인 분석 후 삭제.
+이후 dev-mshuttle-bad 는 원인 분석 후 삭제.
 
 ---
 
 ## 예상 시간
 
 | 단계 | 시간 |
-|------|------|
+|---|---|
 | Step 1. start | 5~10분 |
 | Step 2. 새 인스턴스 생성 | 10~15분 |
 | Step 3. dump | 5~10분 |
@@ -295,11 +306,9 @@ aws rds modify-db-instance --region $REGION \
 
 ## 체크리스트
 
-작업 진행 시 순서대로 체크:
-
 - [ ] 옛 인스턴스의 master 비밀번호 확보
 - [ ] 사용자 DB 이름 목록 작성 (system DB 제외)
-- [ ] mshuttle EC2(또는 로컬)에서 RDS endpoint 접근 가능 확인
+- [ ] mshuttle EC2 (또는 로컬) 에서 RDS endpoint 접근 가능 확인
 - [ ] dump 공간 충분 확인 (`df -h`)
 - [ ] Step 1: dev-mshuttle start
 - [ ] Step 2: dev-mshuttle-new 생성
@@ -315,7 +324,14 @@ aws rds modify-db-instance --region $REGION \
 
 ## 주의사항
 
-- **이 가이드는 stopped 상태의 dev DB 기준.** 운영 DB에 적용 시 무중단 마이그레이션(DMS, blue-green deployment) 검토 필요.
-- **자동 스냅샷 17개**가 옛 dev-mshuttle에 묶여있음. 옛 인스턴스 삭제 시 자동 스냅샷도 정리 옵션 제공됨.
-- **Parameter Group `params-dev-mysql84`**는 커스텀 그룹. 변경 사항이 있다면 새 인스턴스에도 그대로 반영되어야 동작 보장.
-- **Security Group `sg-a8fee9c1`(default) + PubliclyAccessible: true는 옛 인스턴스 설정 그대로 유지.** 새 인스턴스에서 SG를 좁히거나 public 접근을 막으려면 사용자 명시 지시 후 진행. 위 Step 2 명령은 기존 설정과 동일하게 작성되어 있음.
+- **이 가이드는 stopped 상태의 dev DB 기준.** 운영 DB 에 적용 시 무중단 마이그레이션 (DMS, blue-green deployment) 검토 필요.
+- **자동 스냅샷 17개**가 옛 dev-mshuttle 에 묶여있음. 옛 인스턴스 삭제 시 자동 스냅샷도 정리 옵션 제공됨.
+- **Parameter Group `params-dev-mysql84`** 는 커스텀 그룹. 변경 사항이 있다면 새 인스턴스에도 그대로 반영되어야 동작 보장.
+- **Security Group `sg-a8fee9c1` (default) + PubliclyAccessible: true 는 옛 인스턴스 설정 그대로 유지.** 새 인스턴스에서 SG 를 좁히거나 public 접근을 막으려면 사용자 명시 지시 후 진행. 위 Step 2 명령은 기존 설정과 동일하게 작성되어 있음.
+
+## production-mshuttle 적용 시 추가 고려
+
+같은 절차 (100GB → 25GB) 로 -$6.96/월 가능. 단:
+- **운영 DB → 무중단 마이그레이션 필수** (DMS 또는 blue-green). 위 stop → dump → import 로는 다운타임 큼.
+- read replica (production-mshuttle-read1) 도 같이 재생성 필요 (source 축소 후 100GB 제약 해소). [[../aws-ops/2026-06-03-read-replica-az-migration]] 와 묶어서 계획.
+- → 별도 프로젝트로. [[../aws-pending#production-mshuttle-source-storage-축소]]
