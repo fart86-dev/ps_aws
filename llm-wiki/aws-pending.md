@@ -190,37 +190,26 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 
 ---
 
-## DynamoDB Phase 2 — analysis_alert 계열 3개
+## DynamoDB analysis_alert 계열 5개 (Phase 2/3 잔여)
 
-**상태:** 🟡 담당자 확인 후 삭제
+**상태:** 🟡 담당자 확인 후 (재검토)
 
-**대상:** `production_dr_runn_analysis_alert`, `_analysis_alert_hst`, `_analysis_alert_log`. 2026-05-11~12 생성 후 활동 0.
+**대상 (여전히 삭제된 상태, 재생성 판단 필요):**
+- production 3개: `production_dr_runn_analysis_alert`, `_analysis_alert_hst`, `_analysis_alert_log`
+- dev 2개: `dev_dr_runn_analysis_alert`, `_analysis_alert_log`
 
-**왜:** 준비만 하고 붙이지 않은 미완 기능일 가능성. 실사용 확인 필요.
+**왜:** 2026-07-02 사고 (Phase 2/3 삭제 → CDK 관리 4개 오삭제 및 복구) 시점에 삭제됨. 이 5개는 CDK 관리 밖으로 확인. 어디서 만들어졌는지 (다른 CDK/SAM/Terraform / 수동?) 확인 필요.
 
-**잠재 효과:** -$5.6/월.
+**잠재 이슈:**
+- 소유 앱/리포에서 참조 코드 있으면 지금부터 에러 발생 중일 수 있음
+- 담당자가 "쓸 예정 있었음" 하면 어떤 스키마로 재생성할지 확인 필요
 
-**다음 행동:** driver-app 담당자에게 "analysis_alert 기능 사용 예정 있나요?" 확인 → 없으면 삭제.
+**다음 행동:**
+- driver-app 담당자 확인: "analysis_alert 기능 상태와 소유 리포"
+- 사용 예정 없으면 이 항목 종료 (판정 유효)
+- 사용 예정 있으면: 소유 IaC 확인 → 재배포 or 수동 재생성
 
-관련: [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]] 의 후속 섹션.
-
----
-
-## DynamoDB Phase 3 — dev_dr_runn_* 6개
-
-**상태:** 🟡 dev 환경 정책 결정 후
-
-**대상:** `dev_dr_runn`, `_hist`, `_status`, `_status_hst`, `_analysis_alert`, `_analysis_alert_log`. 2025-12~2026-05 생성, 대부분 empty + 7일 활동 0.
-
-**왜:** dev 환경 자체가 사실상 미사용 상태로 보임. dev_dr_runn_status 에 19개 아이템 남아있지만 무활동.
-
-**잠재 효과:** -$21/월.
-
-**다음 행동:** dev 환경 존치 여부 결정 →
-- 폐기: 6개 전부 삭제 (dev_dr_runn_status 백업 권장)
-- 유지: On-demand 로 전환 (사용 시 자동 살아나고 비용도 사용량 기반)
-
-관련: [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]].
+관련: [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]]
 
 ---
 
@@ -252,3 +241,4 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 - ✅ 2026-07-01 Pinpoint MobileHub 잔재 앱 2개 삭제 → [[aws-ops/2026-07-01-pinpoint-mobilehub-cleanup]]
 - ✅ 2026-07-01 msdeveloper STD 30→7일 단축 (-$40/월 예상) → [[aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten]]
 - ✅ 2026-07-01 DynamoDB drv_runn_*_production 5개 삭제 (-$25/월) → [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]]
+- ✅ 2026-07-02 DynamoDB dev 4개 오삭제 복구 및 재발 방지 (순 절감 -$34/월) → [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]]

@@ -4,9 +4,12 @@ date: 2026-07-01
 account: "306331009209"
 region: ap-northeast-2
 category: [dynamodb, cleanup, provisioned]
-impact: -$25/월
-status: done
+impact: -$25/월 (Phase 1 만)
+status: superseded
+correction: [[2026-07-02-dynamodb-recovery-and-lessons]]
 ---
+
+> ⚠️ **정정 (2026-07-02):** 이 노트는 Phase 1 (5개) 판정만 유효. 이후 Phase 2/3 진행분 (9개 추가 삭제) 중 4개가 CDK 스택 `driver-tracking-api-dev` (`~/iac/iac_ddb_runn`) 관리 대상이었음. 사후 복구 완료. 상세는 [[2026-07-02-dynamodb-recovery-and-lessons]] 참조.
 
 # 2026-07-01 · DynamoDB `drv_runn_*_production` 5개 삭제 (이전 세대 잔재)
 
