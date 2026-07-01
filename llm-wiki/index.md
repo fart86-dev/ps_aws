@@ -31,6 +31,7 @@ updated: 2026-06-26
 - [[aws-ops/2026-06-04-msdeveloper-s3-lifecycle]] — S3 라이프사이클 (-$114/월 실측)
 - [[aws-ops/2026-06-04-apigw-exec-log-cleanup]] — API Gateway execution log 정리
 - [[aws-ops/2026-06-16-cloudfront-admin-function-attach]] — admin-fe-request-dev 일괄 연결
+- [[aws-ops/2026-07-01-pinpoint-mobilehub-cleanup]] — Pinpoint MobileHub 잔재 앱 2개 삭제 (서비스 종료 대응)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결

@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-06-25
+last_updated: 2026-07-01
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -199,3 +199,4 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 - ✅ 2026-06-04 msdeveloper S3 라이프사이클 (-$114/월 실측) → [[aws-ops/2026-06-04-msdeveloper-s3-lifecycle]]
 - ✅ 2026-06-04 API Gateway execution log 2개 정리 → [[aws-ops/2026-06-04-apigw-exec-log-cleanup]]
 - ✅ 2026-06-16 dev-admin-* 17개 distribution 에 admin-fe-request-dev 일괄 연결 → [[aws-ops/2026-06-16-cloudfront-admin-function-attach]]
+- ✅ 2026-07-01 Pinpoint MobileHub 잔재 앱 2개 삭제 → [[aws-ops/2026-07-01-pinpoint-mobilehub-cleanup]]
