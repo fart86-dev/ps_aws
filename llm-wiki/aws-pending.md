@@ -200,3 +200,4 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 - ✅ 2026-06-04 API Gateway execution log 2개 정리 → [[aws-ops/2026-06-04-apigw-exec-log-cleanup]]
 - ✅ 2026-06-16 dev-admin-* 17개 distribution 에 admin-fe-request-dev 일괄 연결 → [[aws-ops/2026-06-16-cloudfront-admin-function-attach]]
 - ✅ 2026-07-01 Pinpoint MobileHub 잔재 앱 2개 삭제 → [[aws-ops/2026-07-01-pinpoint-mobilehub-cleanup]]
+- ✅ 2026-07-01 msdeveloper STD 30→7일 단축 (-$40/월 예상) → [[aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten]]
