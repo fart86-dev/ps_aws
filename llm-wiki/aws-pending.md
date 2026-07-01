@@ -190,6 +190,56 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 
 ---
 
+## DynamoDB Phase 2 — analysis_alert 계열 3개
+
+**상태:** 🟡 담당자 확인 후 삭제
+
+**대상:** `production_dr_runn_analysis_alert`, `_analysis_alert_hst`, `_analysis_alert_log`. 2026-05-11~12 생성 후 활동 0.
+
+**왜:** 준비만 하고 붙이지 않은 미완 기능일 가능성. 실사용 확인 필요.
+
+**잠재 효과:** -$5.6/월.
+
+**다음 행동:** driver-app 담당자에게 "analysis_alert 기능 사용 예정 있나요?" 확인 → 없으면 삭제.
+
+관련: [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]] 의 후속 섹션.
+
+---
+
+## DynamoDB Phase 3 — dev_dr_runn_* 6개
+
+**상태:** 🟡 dev 환경 정책 결정 후
+
+**대상:** `dev_dr_runn`, `_hist`, `_status`, `_status_hst`, `_analysis_alert`, `_analysis_alert_log`. 2025-12~2026-05 생성, 대부분 empty + 7일 활동 0.
+
+**왜:** dev 환경 자체가 사실상 미사용 상태로 보임. dev_dr_runn_status 에 19개 아이템 남아있지만 무활동.
+
+**잠재 효과:** -$21/월.
+
+**다음 행동:** dev 환경 존치 여부 결정 →
+- 폐기: 6개 전부 삭제 (dev_dr_runn_status 백업 권장)
+- 유지: On-demand 로 전환 (사용 시 자동 살아나고 비용도 사용량 기반)
+
+관련: [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]].
+
+---
+
+## DynamoDB Phase 4 — 활성 4개 On-demand 전환 검토
+
+**상태:** 🟡 트래픽 패턴 분석 후
+
+**대상:** `production_dr_runn`, `production_dr_runn_hist`, `production_dr_runn_status`, `production_dr_runn_status_hst`.
+
+**왜:** PROVISIONED 20 WCU 인데 실사용 평균 0.76 WCU 등 프로비저닝 과다.
+
+**잠재 효과:** 추정 -$20~30/월. On-demand 는 사용량 기반이라 스파이크 있으면 오히려 비쌀 수 있어 반드시 CloudWatch 로 트래픽 패턴 (peak vs baseline) 확인 필요.
+
+**다음 행동:** 각 테이블별 30일 ConsumedRead/WriteCapacityUnits peak/avg 분석 → On-demand 예상 비용 계산 → 이득 확인 후 전환.
+
+전환 명령 (참고): `aws dynamodb update-table --table-name X --billing-mode PAY_PER_REQUEST`
+
+---
+
 ## (참고) 완료된 작업
 
 - ✅ 2026-06-01 VPC/EC2/SG/EIP/ENI/AMI/Snapshot/Glue/DataZone 정리 → [[aws-ops/2026-06-01-vpc-ec2-cleanup]]
@@ -201,3 +251,4 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 - ✅ 2026-06-16 dev-admin-* 17개 distribution 에 admin-fe-request-dev 일괄 연결 → [[aws-ops/2026-06-16-cloudfront-admin-function-attach]]
 - ✅ 2026-07-01 Pinpoint MobileHub 잔재 앱 2개 삭제 → [[aws-ops/2026-07-01-pinpoint-mobilehub-cleanup]]
 - ✅ 2026-07-01 msdeveloper STD 30→7일 단축 (-$40/월 예상) → [[aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten]]
+- ✅ 2026-07-01 DynamoDB drv_runn_*_production 5개 삭제 (-$25/월) → [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]]
