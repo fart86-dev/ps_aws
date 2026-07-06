@@ -36,6 +36,7 @@ updated: 2026-06-26
 - [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]] — DynamoDB drv_runn_*_production 5개 삭제 (-$25/월)
 - [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]] — dev 4개 오삭제 복구 및 재발 방지 (실제 순절감 -$34/월)
 - [[aws-ops/2026-07-06-cognito-amplify-audit]] — Cognito/Amplify/Node ≤20 Lambda 감사 (90일 모니터 후 재판정)
+- [[aws-ops/2026-07-06-staging-cleanup]] — staging 환경 폐기 정리 조사 (스택 17개 + 스택 밖 자원, 실행 승인 대기)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결

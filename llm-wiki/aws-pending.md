@@ -145,12 +145,35 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 **Node 20.x 46개:**
 - production 계열 18개 마이그레이션 우선순위 최상
 - dev 계열 11개 순차
-- staging 계열 17개 → **실사용 여부 조사 필요** (2024-11~2025-01 이후 미수정 다수)
+- staging 계열 14개 → 사용자가 "staging 폐기" 확정 (2026-07-06). 별도 정리 항목 [[aws-ops/2026-07-06-staging-cleanup]] 참조
 - 특기: `production-ps-channel-meets*` 3개는 2026-05 신규 배포인데도 Node 20 → 신규 프로젝트 런타임 선택 표준 부재
 
 **다음 행동:**
-- staging-user-* 계열 17개 CloudWatch invocation 30일 관찰 → dead 리스트업
+- staging 14개 → [[#staging-환경-폐기-정리]] 로 이관
 - production 18개는 각 리포 소유팀 확인 후 마이그레이션 티켓 발행 (ps_aws 범위 밖)
+
+---
+
+## staging 환경 폐기 정리
+
+**상태:** 🟡 조사 완료, 실행 승인 대기
+
+**대상:** staging CFN 스택 17개 (그룹 A restapi 7, 그룹 B CloudFront app 4, 그룹 C Lambda URL app 3, 그룹 D 추가 3) + 스택 밖 `admin.mshuttle.staging` S3 + `dr-serv-staging` API Gateway + Route53 `mshuttle.click` staging 레코드.
+
+**왜:** 사용자 진술 "staging 폐기" 확보 (2026-07-06). 30일 실 트래픽 0, 1년 반 배포 없음, 데이터 저장소 스택 안에 없음 = 위험 낮은 정리 후보. 다만 CloudFront 4개가 여전히 `mshuttle.click` 서브도메인 (user/make/pay/runn) 에 매핑 중이라 DNS 정리 병행 필요.
+
+**잠재 효과:** 비용 절감 미미 (Lambda 무트래픽, CloudFront 사용량 0), dead resource 정리 + Node 20 이하 카운트 감소 (14/46 → 32/46) + `mshuttle.click` DNS clean.
+
+**다음 행동:**
+- 사용자 승인 후 [[aws-ops/2026-07-06-staging-cleanup#7-삭제-실행-방식-권장]] 절차대로 진행
+- 미해결 5개 확인 항목 답변 확보 필요:
+  1. 4개 서브도메인 (user/make/pay/runn) 정말 폐기?
+  2. `admin.mshuttle.staging` S3 폐기 범위?
+  3. `dr-serv-staging` API Gateway 소속?
+  4. 그룹 D 3개 함께 처리?
+  5. 실행 트리거 시점 (지금 vs 90일 재검토 병행)
+
+**주의:** 반드시 스택 단위 `delete-stack` 사용. 개별 함수/리소스 삭제 금지 (2026-07-02 DynamoDB 오삭제 사고 재발 방지). 상세 [[aws-ops/2026-07-06-staging-cleanup]].
 
 ---
 
