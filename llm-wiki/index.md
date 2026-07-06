@@ -35,6 +35,7 @@ updated: 2026-06-26
 - [[aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten]] — msdeveloper STD 30→7일 단축 (-$40/월 예상)
 - [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]] — DynamoDB drv_runn_*_production 5개 삭제 (-$25/월)
 - [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]] — dev 4개 오삭제 복구 및 재발 방지 (실제 순절감 -$34/월)
+- [[aws-ops/2026-07-06-cognito-amplify-audit]] — Cognito/Amplify/Node ≤20 Lambda 감사 (90일 모니터 후 재판정)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결

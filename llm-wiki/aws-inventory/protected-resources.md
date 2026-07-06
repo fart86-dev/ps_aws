@@ -130,10 +130,37 @@ status: active
 
 ---
 
+## 9) rn_drapp Kinesis 로그 파이프라인 (Cognito Identity Pool `drapp42d078e1`)
+
+**상태:** rn_drapp Android 앱이 실사용 (production 포함).
+
+**왜:** `rn_drapp/android/app/src/main/java/com/modooshuttle/drapp/Util/KinesisManager.kt:17` 에 identity pool ID 하드코딩. 앱이 이 pool 로 unauthenticated identity 발급 → Kinesis Firehose 로그 전송. **pool 이름에 `_dev` 가 붙어있지만 dev/production 공용** (stage 분기 없음, Firehose stream 이름만 stage 별로 다름).
+
+**상세 리소스:**
+
+| 리소스 | ID / 이름 | 역할 |
+|---|---|---|
+| Cognito Identity Pool | `ap-northeast-2:6b0dc290-331e-4a13-9445-038a5c6581d9` (`drapp42d078e1_identitypool_42d078e1__dev`) | credential 발급 진입점 — **rn_drapp 실사용** |
+| Cognito User Pool | `ap-northeast-2_DSrE4OBGH` (`drapp42d078e1_userpool_42d078e1-dev`) | 위 IP 의 auth provider 로 client 2개 (`19g22f6ca77vnfrtk3un25tl8c`, `h6vki0u7p3fa5df06p9k55c7j`) 등록. 앱은 user pool 인증 flow 를 안 쓰지만 IP 설정 참조 관계 존재 |
+| IAM Role (authenticated) | `amplify-drapp-dev-152044-authRole` | (미사용 flow) |
+| IAM Role (unauthenticated) | `amplify-drapp-dev-152044-unauthRole` | rn_drapp guest identity 의 실행 권한 — Firehose:PutRecord |
+
+**건드릴 수 있는 범위:**
+- ❌ Identity Pool `6b0dc290` 삭제 — production 앱 Kinesis 로그 파이프라인 즉시 파괴
+- ❌ IAM Role `amplify-drapp-dev-152044-{auth,unauth}Role` 삭제
+- ❌ User Pool `DSrE4OBGH` 즉시 삭제 — IP 의 CognitoIdentityProvider 설정이 이 pool 의 client 를 참조 중. 정 지우려면 IP 에서 provider 제거 먼저
+- ✅ 관련 Lambda `amplify-drapp-dev-152044-UpdateRolesWithIDPFunctio-...` (Node 18) 은 초기 role 세팅용 헬퍼로 판단 → 별도 판정 후 함수만 삭제 가능성 있음 (CFN 관리 대상 여부 사전 확인 필수)
+
+**신형 앱 관계:** rtn_drapp (신형) 에는 이 pool 참조 없음. 신형 앱 완전 이관 시 재검토 대상.
+
+**관련 위키:** [[../aws-ops/2026-07-06-cognito-amplify-audit]] (예정)
+
+---
+
 ## ps_aws 코드에서 이 목록을 어떻게 다루나
 
 - `src/scripts/wafBotControl.ts` 의 `disable` 은 위 (3) 의 "허용 범위" 안에서만 동작 (rule 1개만 제거).
 - `src/scripts/rdsStatus.ts` 의 findings 룰은 `production-mshuttle` 에도 같은 finding 을 적용하지만 자동 조치는 안 함 (보고만).
 - `src/infra-monitor/waste.ts` 는 RDS/EBS/EC2/EIP/ENI/Snapshot 의 "낭비 후보" 를 보고하지만 운영 자원도 후보로 잡힐 수 있음 → **알림은 통지 목적**, 자동 조치는 절대 없음.
 
-새 자동 조치 코드 / 신규 sweep 스크립트를 추가할 때 위 8개 항목을 자동 제외 리스트에 반드시 포함.
+새 자동 조치 코드 / 신규 sweep 스크립트를 추가할 때 위 9개 항목을 자동 제외 리스트에 반드시 포함.

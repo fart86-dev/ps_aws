@@ -111,6 +111,49 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 
 ---
 
+## Cognito/Amplify dead 후보 90일 재검토
+
+**상태:** ⏳ 2026-10-06 재검토 대기
+
+**대상:** Cognito User Pool 6개, Identity Pool 5개, Amplify 앱 5개, Node 12/16 Lambda 8개 + 부속 IAM role. rn_drapp 이 실사용하는 `drapp42d078e1` (IP `6b0dc290` + UP `DSrE4OBGH`) 는 **제외**.
+
+**왜:** 2026-07-06 감사에서 코드 참조 0 / SignIn 0 / Amplify branches 0 / Lambda invocations 0 확인. 하지만 배포 앱 바이너리·연 1회 배치 등 반증 시나리오 배제 못 함 → 90일 무변화 관찰로 확신도 확보.
+
+**잠재 효과:** 비용 절감 미미 (Cognito free tier), dead resource + 보안 표면 정리 가치.
+
+**다음 행동:**
+- 2026-10-06 도래 시 [[aws-ops/2026-07-06-cognito-amplify-audit#4-90일-모니터-프로토콜]] 의 지표 재수집
+- 모든 지표 0/무변화 → 순차 삭제 (Amplify 앱 → Lambda → User Pool → Identity Pool → IAM role)
+- 변화 있으면 판정 재고
+- 결과를 [[aws-ops/2026-07-06-cognito-amplify-audit]] 에 append
+
+---
+
+## Node 20.x 이하 Lambda 마이그레이션 로드맵
+
+**상태:** 🟡 계획 수립 후 진행
+
+**대상:** ap-northeast-2 Lambda 58개 (Node 12: 6, Node 16: 4, Node 18: 2, Node 20: 46).
+
+**왜:** Node 12/16/18 은 이미 EOL 완료 (2023-03 / 2024-06 / 2025-04). Node 20 은 2026-04 지원 축소 진행 중.
+
+**즉시 확인 후보 (EOL 완료 12개):**
+- Node 12/16 amplify-login 8개 + amplify-drapp UpdateRoles 1개 → 위 감사 항목 재검토와 병행
+- `analysis-admin-production-warmup-plugin` (Node 12), `analysis-geo-production-warmup-plugin-default` (Node 18, **2026-04 최근 수정 = 활성**) → warmup 코드 살아있는지 확인 후 마이그레이션 or 삭제
+- `efstestpy-dev-warmup-plugin` (Node 12) → test 흔적, 삭제 후보
+
+**Node 20.x 46개:**
+- production 계열 18개 마이그레이션 우선순위 최상
+- dev 계열 11개 순차
+- staging 계열 17개 → **실사용 여부 조사 필요** (2024-11~2025-01 이후 미수정 다수)
+- 특기: `production-ps-channel-meets*` 3개는 2026-05 신규 배포인데도 Node 20 → 신규 프로젝트 런타임 선택 표준 부재
+
+**다음 행동:**
+- staging-user-* 계열 17개 CloudWatch invocation 30일 관찰 → dead 리스트업
+- production 18개는 각 리포 소유팀 확인 후 마이그레이션 티켓 발행 (ps_aws 범위 밖)
+
+---
+
 ## madmin KMS pending window
 
 **상태:** ⏳ 2026-07-02 영구 삭제 모니터링
