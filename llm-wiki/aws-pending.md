@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-07-01
+last_updated: 2026-07-18
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -292,6 +292,67 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 **다음 행동:** 각 테이블별 30일 ConsumedRead/WriteCapacityUnits peak/avg 분석 → On-demand 예상 비용 계산 → 이득 확인 후 전환.
 
 전환 명령 (참고): `aws dynamodb update-table --table-name X --billing-mode PAY_PER_REQUEST`
+
+---
+
+## DynamoDB 위치정보 저장 암호화 (OPA 실태점검 대응)
+
+**상태:** ✅ dev + production 전부 배포 완료 (2026-07-18 21:37 KST) — 남은 건 OPA 제출용 캡쳐뿐 (규제 대응 — 비용 항목 아님)
+
+**진행:**
+- 2026-07-18 dev 4개 테이블 SSE→KMS(AWS 관리형) 전환 완료 및 검증 완료(AppSync mutation/query 왕복 테스트까지 통과). 상세 [[aws-ops/2026-07-17-dynamodb-location-encryption-audit#6-실행-결과--옵션-a-dev-배포-2026-07-18]].
+- 2026-07-18 production `detect-stack-drift` 완료 — 13개 리소스 드리프트지만 전부 ProvisionedThroughput/MinCapacity 등 **용량 숫자**뿐(Auto Scaling + 레거시 용량 크론에 의한 정상 동적 관리), 구조적 드리프트 0건.
+- 2026-07-18 `cdk diff --context stage=production`(change set 기준)으로 재확인 — **용량 관련 변경은 없음.** CloudFormation은 직전 템플릿 대비 실제 바뀐 속성만 반영하므로, 이번처럼 `encryption`만 추가한 배포는 드리프트 난 용량을 안 건드림(처음엔 "리셋된다"고 오판했다가 정정). 상세 [[aws-ops/2026-07-17-dynamodb-location-encryption-audit#7-production-드리프트-점검-결과-2026-07-18]].
+- **배포 타이밍:** 오늘 저녁 배포 예정. 용량 리스크는 없는 것으로 확인됐으나, 주말 저트래픽 타이밍은 일반적인 안전 관행으로 유지.
+- **추가 발견:** `iac_ddb_alert`/`iac_ddb_runn_analysis`(analysis_alert 계열, 위경도 포함)도 동일하게 `encryption` 옵션 누락. 현재 해당 테이블은 라이브로 존재하지 않아 당장 영향 없음 — 재배포 결정 시([[#dynamodb-analysis_alert-계열-5개-phase-2-3-잔여]]) 같이 처리 필요. 상세 [[aws-ops/2026-07-17-dynamodb-location-encryption-audit#10-추가-발견--iac_ddb_alertiac_ddb_runn_analysis도-동일-gap-2026-07-18]].
+- OPA 제출용 캡쳐 방법/주의사항은 [[aws-ops/2026-07-17-dynamodb-location-encryption-audit#8-opa-제출용-증빙-캡쳐-방법-production-적용-후에만-유효]] 참조 — production 배포 완료로 이제 캡쳐 유효.
+- **제출기한(2026-07-17) 경과 인지 상태** — 사용자가 기한이 지난 뒤 이 건을 인지했음을 확인(2026-07-18). 배포/제출은 그대로 진행하되 기한 경과 자체는 별도 리스크로 남음(OPA 커뮤니케이션 필요 여부는 ps_aws 위키 범위 밖, docs 프로젝트 쪽에서 트래킹).
+
+**대상:** `production_dr_runn`, `production_dr_runn_hist` (기사 GPS 위경도 원본). `SSEDescription: null` = AWS 소유 키 기본 암호화만 적용, 필드 레벨 암호화 없음. scan 결과 lat/lng 평문 확인됨.
+
+**왜:** OPA 2026년도 실태점검 1차에서 "위치정보 저장 암호화 미흡" 판정, 2차 보완자료 제출기한 2026-07-17. 상세 조사 [[aws-ops/2026-07-17-dynamodb-location-encryption-audit]], 소비자 확장 조사 [[aws-ops/2026-07-18-dynamodb-stream-consumer-audit]].
+
+**확인된 소비자 4곳** (암호화 변경 전 전부 영향 점검 필요):
+1. AppSync (iac_ddb_runn) — `custom-appsync-role-{stage}`, 실시간 R/W
+2. driver-runn-cron Lambda — ⚠️ 하드코딩 Access Key로 PITR 기반 야간 Export to S3
+3. infra ddb_status Lambda — WCU 조정, 암호화 무관
+4. iac_shuttle_analytics (Managed Flink) — Streams 직접 구독, **현재 정지 상태(의도됨, 2026-07-18 확인)**
+
+**옵션:**
+- A) SSE를 AWS 관리형 KMS 키로 전환 — 온라인 무중단, 앱 코드 변경 없음. 단 위 1)~4) 소비자의 KMS 권한 영향 **미검증** (Flink는 재가동 전에만 확인하면 됨, 지금은 정지 상태라 안전). 콘솔 조회 시 평문 노출 자체는 안 풀림.
+- B) 필드 레벨(lat/lng) 암호화 — AppSync가 Lambda 없이 JS 리졸버로 DynamoDB에 직접 연결된 구조라, JS 런타임에 crypto 미지원 시 리졸버를 Lambda 데이터소스로 바꾸는 아키텍처 변경까지 필요할 수 있음(미검증). 기사 앱 쓰기 경로, 실시간 조회 API, Glue ETL(stlog5) 동시 수정 필요. 당일 완료 불가로 판단, OPA 제출은 "진행 중 + 목표일" 소명 방향 논의 중.
+
+**다음 행동:**
+- [x] `driver-tracking-api-production` 스택 `detect-stack-drift` 실행 완료 → 구조적 드리프트 없음, 용량 드리프트뿐이고 이번 배포와는 무관함 확인
+- [x] `cdk diff --context stage=production` 실행 완료 → SSESpecification 4개만, 안전
+- [ ] 오늘 저녁 production 배포 실행
+- [ ] 배포 후 driver-runn-cron 야간 export(하드코딩 키 사용) 정상 동작 확인 — 익일 새벽에나 확인 가능
+- [ ] iac_shuttle_analytics(Flink) 재가동 계획이 생기면 그 전에 `FlinkRole`의 KMS 권한 선확인
+- [ ] analysis_alert 계열 재배포 결정 시 `iac_ddb_alert`/`iac_ddb_runn_analysis`에도 `encryption` 옵션 추가
+- [ ] production 캡쳐 → OPA 2차 제출 문서 첨부, 제출 문구 확정
+- [ ] 옵션 B 착수 여부/완료 목표일 결정 → OPA 2차 제출 문구 확정
+
+---
+
+## cron_serv/driver-runn-cron 하드코딩 AWS 액세스 키 — 소유자 특정 완료
+
+**상태:** 🟡 사용자 결정 대기 (보안 — 회전/IAM Role 전환 필요)
+
+**대상:** `~/sl/cron_serv`, `~/psapp/serv/cron_serv`, `~/psapp/cron/driver-runn-cron`의 12개 이상 파일에 AWS Access Key/Secret이 하드코딩.
+
+**왜:** khj.dev 오프보딩([[aws-ops/2026-07-18-khj-dev-offboarding]]) 조사 중 실제 키 ID로 전수 검색해서 소유자 특정:
+- `AKIAUOUWAIC4676HY4KB` = **kimps** (`runnstatus/handler.ts`, `runnstatus/eventBridge.ts`)
+- `AKIAUOUWAIC46JCDIJF6` = **fart86** (`infra/config.ts`, `board/aws.ts`, `evtgateway/aws.ts`, `watch/*`, **`runn/S3Export.ts`(위치정보 야간 익스포트)**, `runn/athena.ts`, `runn/s3.ts`, `driver-runn-cron` 4개 파일 등 12곳 이상)
+- `AKIAUOUWAIC4WUMHB5VD` = **email** (`cron-common/SendEmailService.ts`)
+
+fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이프라인이 이 계정 키로 동작 중이라는 뜻.
+
+**잠재 효과:** 장기 자격증명 하드코딩은 유출 시 계정 전체 장악 위험. IAM Role 기반(Lambda 실행 역할)으로 전환하는 게 표준.
+
+**다음 행동:**
+- 각 Lambda(driver-runn-cron 등)를 실행 역할(IAM Role) 기반으로 전환 — 코드에서 `accessKeyId`/`secretAccessKey` 하드코딩 제거
+- 전환 전까지는 최소한 해당 키 로테이션 주기 확인
+- `fart86`이 실제 활성 서비스 계정인지, 아니면 이 계정도 정리 대상인지 확인 필요(khj.dev처럼 콘솔 로그인은 오래전(2018)이라 사람 사용은 아닌 것으로 보이나 액세스키는 활발히 쓰임 — 서비스 계정으로 판단됨)
 
 ---
 

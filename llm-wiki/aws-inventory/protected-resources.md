@@ -157,6 +157,21 @@ status: active
 
 ---
 
+## 9) GuardDuty (ap-northeast-2)
+
+**상태:** 활성 유지. 2026-07-18 신규 활성화.
+
+**왜:** OPA 위치정보법 실태점검 2026년도 2차 제출 대응 — "보안프로그램 운영" 항목(영§20②) 증빙. 위치정보시스템(DynamoDB+AppSync)이 서버리스라 전통적 백신 설치가 불가능해, GuardDuty가 그 대체 증빙. 상세 [[../aws-ops/2026-07-18-guardduty-enable]].
+
+**건드릴 수 있는 범위:**
+- ❌ 탐지기 비활성화(`delete-detector`/`update-detector --enable false`) — 규제 대응용으로 켠 것이라 임의 해제 금지
+- ⚠️ 추가 기능(Malware Protection, Runtime Monitoring 등) on/off는 비용 영향 있으니 사용자 확인 후
+- ✅ Finding 조회, 요약 리포트 생성 등은 자유
+
+**ps_aws 코드 영향:** 비용 절감 검토에서 GuardDuty 비용을 "절감 대상 아님"으로 표시. `waste.ts` 등에서 자동 종료 후보로 잡히지 않도록 주의.
+
+---
+
 ## ps_aws 코드에서 이 목록을 어떻게 다루나
 
 - `src/scripts/wafBotControl.ts` 의 `disable` 은 위 (3) 의 "허용 범위" 안에서만 동작 (rule 1개만 제거).
