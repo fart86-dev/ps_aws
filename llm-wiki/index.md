@@ -37,10 +37,11 @@ updated: 2026-07-18
 - [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]] — dev 4개 오삭제 복구 및 재발 방지 (실제 순절감 -$34/월)
 - [[aws-ops/2026-07-06-cognito-amplify-audit]] — Cognito/Amplify/Node ≤20 Lambda 감사 (90일 모니터 후 재판정)
 - [[aws-ops/2026-07-06-staging-cleanup]] — staging 환경 폐기 정리 조사 (스택 17개 + 스택 밖 자원, 실행 승인 대기)
-- [[aws-ops/2026-07-17-dynamodb-location-encryption-audit]] — 위치정보 DynamoDB 저장 암호화 실태 조사 (OPA 실태점검 대응, dev+production 배포 완료)
+- [[aws-ops/2026-07-17-dynamodb-location-encryption-audit]] — 위치정보 DynamoDB 저장 암호화 실태 조사 (OPA 실태점검 대응, dev+production 배포 및 익스포트 파이프라인 검증까지 완료)
 - [[aws-ops/2026-07-18-dynamodb-stream-consumer-audit]] — DynamoDB Streams 소비자(Flink 실시간 분석) 확인, 암호화 변경 영향 범위 확정
 - [[aws-ops/2026-07-18-guardduty-enable]] — GuardDuty 활성화 (OPA 실태점검 "보안프로그램 운영" 항목 대응)
 - [[aws-ops/2026-07-18-khj-dev-offboarding]] — 퇴사자 IAM 계정(`khj.dev`) 완전 삭제, 위치정보시스템 하드코딩 키 소유자(kimps/fart86/email) 특정
+- [[aws-ops/2026-07-19-iam-grant-revoke-cloudtrail-audit]] — OPA 5번 소명용 IAM 부여·말소 정확 시각을 CloudTrail 원본 로그로 조사, 루트 계정 IAM 작업 사용 발견
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결

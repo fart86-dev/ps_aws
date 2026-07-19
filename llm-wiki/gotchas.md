@@ -280,6 +280,16 @@ dev 스택(`driver-tracking-api-dev`)은 Auto Scaling 미적용이라 이 드리
 
 ---
 
+## [AWS] CloudTrail `lookup-events`는 90일 제한 + IAM은 `us-east-1` 명시 필요  #gotcha
+
+`aws cloudtrail lookup-events`(Event history API)는 **최근 90일만 조회 가능** — 트레일의 S3 보존기간이 길어도 무관한 AWS 하드 리밋.
+
+IAM은 글로벌 서비스라 이벤트가 **`us-east-1`에 기록됨**. 계정 기본 리전이 `ap-northeast-2`라도 `--region us-east-1`을 명시하지 않으면 `lookup-events`가 **조용히 0건**을 반환한다(에러 없음 — "이벤트가 없나 보다"로 오판하기 쉬움).
+
+90일 이전의 IAM 변경 이력이 필요하면 트레일의 S3 원본 로그(`s3://<트레일버킷>/AWSLogs/<계정ID>/CloudTrail/us-east-1/`)를 직접 받아서 조사해야 함 — [[aws-ops/2026-07-19-iam-grant-revoke-cloudtrail-audit]]에서 OPA 소명용 IAM 부여일 추적할 때 실제로 이 경로로 우회. 파일 수가 하루 100개 이상(대부분 빈 하트비트)이라 `zgrep`으로 후보를 추린 뒤 `requestParameters.userName`(작업 대상)으로 필터링 — `userIdentity`(수행자)와 헷갈리면 관련없는 이벤트가 대량 오탐된다.
+
+---
+
 ## [AWS] `iam delete-user`는 그룹 제거만으론 안 됨 — 직접 붙은 정책까지 다 떼야 함  #gotcha
 
 IAM 사용자 삭제 순서를 그룹 탈퇴 → 액세스키 삭제 → SSH키 삭제 → `delete-user`로 진행하면, **사용자에게 관리형/인라인 정책이 직접(그룹 아닌) 붙어있을 경우 `DeleteConflict` 에러로 막힌다.**
