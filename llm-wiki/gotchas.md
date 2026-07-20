@@ -4,7 +4,7 @@ repo: ps-aws
 domains: []
 stack: [aws-sdk-v3, aws-cli, cloudwatch, node-cron]
 status: active
-updated: 2026-07-18
+updated: 2026-07-20
 ---
 
 # gotchas — 건드리면 터지는 곳
@@ -315,3 +315,18 @@ IAM 사용자 삭제 순서를 그룹 탈퇴 → 액세스키 삭제 → SSH키 
 8. `delete-user`
 
 퇴사자 오프보딩처럼 반복될 작업이라 순서를 기억해둘 것.
+
+---
+
+## [AWS] `aws configure agent-toolkit`는 프로젝트가 아니라 macOS 사용자 계정 전역을 건드림  #gotcha
+
+`aws/agent-toolkit-for-aws` (공식 AWS 저장소) 의 `aws configure agent-toolkit --yes --region us-east-1` 는:
+- **AWS CLI `2.36+` 필요** — `2.22.27`(2025-01 pkg 설치본)에는 `agent-toolkit` 서브커맨드 자체가 없음. macOS 는 공식 설치 가이드의 `install.sh`(Linux 전용)가 아니라 `.pkg` 로 업그레이드해야 함:
+  ```bash
+  curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o AWSCLIV2.pkg
+  sudo installer -pkg AWSCLIV2.pkg -target /
+  ```
+- **글로벌 사이드이펙트**: `~/.claude.json`(Claude Code 전역 MCP), `~/.cursor/mcp.json`, `~/.gemini/settings.json`, codex 설정에 `aws-mcp` 서버를 한 번에 추가하고 `~/.claude/skills` 등에 스킬을 설치한다 — **이 `ps_aws` 리포 범위가 아니라 이 macOS 계정에서 여는 모든 프로젝트**에 영향.
+- 도구가 제공하는 `rules/aws-agent-rules.md` 를 그대로 프로젝트 `CLAUDE.md`에 덮어쓰면 이 리포의 protected-resources/절대규칙이 날아감 — 반영할 땐 별도 파일([[../aws-agent-toolkit-rules]])로 분리할 것.
+
+상세 [[aws-ops/2026-07-20-agent-toolkit-setup]].

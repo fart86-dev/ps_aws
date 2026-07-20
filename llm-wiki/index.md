@@ -5,7 +5,7 @@ domains: []
 stack: [aws-cli, aws-sdk-v3, fastify, typescript, node-cron, tsx]
 status: active
 bus_factor: 1
-updated: 2026-07-18
+updated: 2026-07-20
 ---
 
 # ps-aws 위키
@@ -43,6 +43,7 @@ updated: 2026-07-18
 - [[aws-ops/2026-07-18-khj-dev-offboarding]] — 퇴사자 IAM 계정(`khj.dev`) 완전 삭제, 위치정보시스템 하드코딩 키 소유자(kimps/fart86/email) 특정
 - [[aws-ops/2026-07-19-iam-grant-revoke-cloudtrail-audit]] — OPA 5번 소명용 IAM 부여·말소 정확 시각을 CloudTrail 원본 로그로 조사, 루트 계정 IAM 작업 사용 발견
 - [[aws-ops/2026-07-19-location-data-write-path-audit]] — OPA 8번 소명용 위치정보 쓰기(수정) 경로 전수 조사, 조회 전용임을 확인 + AppSync 미사용 위경도 필드 발견
+- [[aws-ops/2026-07-20-agent-toolkit-setup]] — AWS 공식 Agent Toolkit 설정 (CLI 2.36 업그레이드 + Claude Code용 aws-mcp 연결, macOS 계정 전역 영향 주의)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결
