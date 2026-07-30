@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-07-18
+last_updated: 2026-07-30
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -21,13 +21,16 @@ last_updated: 2026-07-18
 
 **대상:** spd-test PostgreSQL + API Gateway + Lambda 체인.
 
-**점검:** 1년간 실사용 거의 0.
+**점검:** 1년간 실사용 거의 0. 2026-07-30 커넥션 실측(14일)으로 재확인: 336시간 중 328시간(97.6%) 완전 0, 비영 시간 8개뿐(전부 Max 1~2).
+
+**⚠️ 신규 발견 (2026-07-30):** `spd-test`만 서비스 관리형 EIP(`54.116.89.109`)로 고정 퍼블릭 IP를 갖고 있음 — 다른 3대는 유동 IP. 고정 IP를 요구하는 것 자체가 "외부 파트너가 화이트리스트로 참조 중"이라는 신호일 수 있음. [[aws-ops/2026-07-30-vpc-rds-privatization-design#6-미해결-질문]] Q3 참조. **RDS 사설화 로드맵 Phase 7에서 spd-test를 건드리기 전에 이 의문을 반드시 해소해야 함.**
 
 **잠재 효과:** TBD (RDS instance 비용이 큼).
 
 **다음 행동:** 사용자가 stop / delete / 유지 결정. 결정 시:
 - stop 만: 인스턴스 시간만 절감 (storage 는 계속 과금)
 - delete: 완전 절감, 단 복구 불가
+- 유지하기로 하면 RDS 사설화 로드맵의 대상에 포함(순서상 dev-mshuttle 다음, production 이전)
 
 (이 항목은 자동 메모리 `project_aws_spd_test_todo` 에도 등록되어 있음.)
 
@@ -387,6 +390,20 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 
 ---
 
+## 위치정보 테이블 TTL 180일 변경 — 배포 여부·시점 결정 필요 (긴급도 상향)
+
+**상태:** 🟡 사용자 결정 대기 (코드 수정 완료, 미배포)
+
+**대상:** `production_dr_runn`, `production_dr_runn_hist` DynamoDB 테이블. 소스: `~/iac/iac_ddb_runn/src/resolvers/{runn,runnHist}/insert.ts`.
+
+**왜:** [[aws-ops/2026-07-20-ttl-under-retention-finding-and-fix]] — OPA examiner가 "이용·제공사실 확인자료"로 요구하는 게 바로 이 테이블이고, 법정 성격상 최소 6개월 이상 보관돼야 하는 것으로 보이는데 현재 TTL 7일로는 그 요건을 못 채움. 1차 제출(2026-04) 때는 6개월치 데이터가 있었으나 지금은 없음 — 진행 중인 under-retention 이슈.
+
+**잠재 효과:** TTL을 180일로 늘리면 `production_dr_runn_hist`(고빈도 GPS 원본) 저장 데이터량이 현재 대비 약 26배(7→180일) 증가 — 스토리지 비용 및 테이블 크기 증가 예상, 배포 전 가늠 필요.
+
+**다음 행동:** 배포 여부·시점 결정 → dev 환경 먼저 검증 → production 배포 → OPA 제출본(3번·12번) 텍스트 갱신.
+
+---
+
 ## 위치정보 테이블 7일 TTL — 설계 의도 확인 필요
 
 **상태:** 🟡 사용자 결정 대기 (낮은 우선순위, 정보 확인성)
@@ -398,6 +415,45 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 **잠재 효과:** 이 7일이 개인정보보호를 의식한 설계인지, 단순 운영 테이블 정리용으로 우연히 같은 숫자가 쓰인 건지 알 수 없음 — 알아두면 향후 리텐션 정책 변경 시(예: 익스포트 파이프라인 보관기간 조정) 실수로 깨뜨리지 않는 데 도움됨.
 
 **다음 행동:** `runnStatus`/`runnStatusHst` insert 리졸버 TTL 확인. 설계 배경은 아는 사람이 있으면 확인, 없으면 그냥 "현재 동작이 이렇다"로 기록만 유지.
+
+---
+
+## RDS 완전 사설화 로드맵
+
+**상태:** 🟡 설계 완료, Phase 0 착수 승인 대기
+
+**대상:** RDS 4대(`production-mshuttle`, `production-mshuttle-read1`, `dev-mshuttle`, `spd-test`) 전부 `PubliclyAccessible=true`, 보안그룹에 3306/5432가 `0.0.0.0/0`으로 인터넷에 열려 있음.
+
+**왜:** 2026-07-30 계정 점검에서 GuardDuty가 최근 10일간 악성 IP의 실제 포트 스캔 6건 탐지(`Discovery:RDS/MaliciousIPCaller`). Security Hub도 4대 전부 HIGH로 플래그. 사용자가 "완전 사설화"를 목표로 확정, 이번엔 설계 문서까지만 진행.
+
+**핵심 난관:** Lambda 151개 중 145개가 VPC 밖에서 RDS 퍼블릭 엔드포인트로 접속 중 — SG 잠금도 RDS 사설화도 전부 이 145개 이관이 전제 조건. `mssam` 배포 툴체인엔 일괄 VPC 주입 지점이 없고, CI가 없어 배포가 전부 수동. 수개월 규모 작업으로 사용자가 인지·수용.
+
+**로드맵:** Phase 0(관측) → 1(네트워크 신설) → 2(주체 확정+구세대 봉인) → 3(개발자 접근 경로, 하드 게이트) → 4(SG 사문화 규칙 제거) → 5(Lambda 이관, 최대 작업량) → 6(비-Lambda 이관) → **7(RDS 공개 해제, 유일한 다운타임)** → 8(SG 완전 잠금) → 9(선택, 비권장). 상세 [[aws-ops/2026-07-30-vpc-rds-privatization-design]].
+
+**잠재 효과:** 순증 약 +$42~58/월(현재 $626 대비 +7~9%), 인터넷 노출 제거.
+
+**다음 행동:** Phase 0(VPC Flow Logs 활성화) 착수 승인. 되돌리기 쉬움(삭제 1회), 위험 최저.
+
+---
+
+## 운영 DB 평문 자격증명 · process.env 로깅 (사설화와 무관, 즉시 조치)
+
+**상태:** 🔴 즉시 조치 필요 (사설화 로드맵보다 급함)
+
+**대상:**
+- `~/psapp/cron/driver-runn-cron/handler.ts:21-27`, `~/psapp/cron/common-validate-cron/handler.ts:21`, `~/psapp/serv/cron_serv/packages/{runn,validate}/handler.ts`, `~/sl/cron_serv/packages/{runn,validate}/handler.ts` — 운영 read1 호스트 + RDS 마스터 계정(`admin`) + **평문 패스워드**가 git에 커밋
+- 15개 파일에서 `console.log("process.env: ", process.env)` — 빌드타임에 주입된 전 시크릿이 매 호출마다 CloudWatch로 덤프
+
+**왜:** 2026-07-30 RDS 사설화 설계 조사 중 발견. `ms_sam` 배포 툴체인이 시크릿을 런타임이 아니라 빌드타임에 webpack `BannerPlugin`으로 번들에 굽는 구조라, 시크릿 갱신만으로는 전파되지 않고 전량 재배포가 필요함. 상세 [[aws-ops/2026-07-30-vpc-rds-privatization-design#8-사설화와-무관하게-즉시-처리할-보안-항목]].
+
+**잠재 효과:** RDS 마스터 계정 평문이 git 히스토리 + `ms-sam` S3 버킷의 모든 과거 배포 아티팩트에 영구 잔존. 로그그룹 접근 권한만 있으면 전 시크릿 열람 가능.
+
+**다음 행동:**
+1. `production-mshuttle` 마스터 패스워드 로테이션 — **단, 로테이션 전에 모든 소비자 재배포 준비를 마쳐야 함** (순서 잘못 잡으면 장애)
+2. 애플리케이션 전용 최소권한 MySQL 계정 신설
+3. 하드코딩 6곳 제거 → `process.env` 경유로 통일
+4. `console.log(process.env)` 15개 파일 제거
+5. `ms-sam` S3 버킷 접근 IAM 최소화 + 라이프사이클로 구 아티팩트 만료
 
 ---
 

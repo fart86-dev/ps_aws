@@ -5,7 +5,7 @@ domains: []
 stack: [aws-cli, aws-sdk-v3, fastify, typescript, node-cron, tsx]
 status: active
 bus_factor: 1
-updated: 2026-07-20
+updated: 2026-07-30
 ---
 
 # ps-aws 위키
@@ -44,7 +44,9 @@ updated: 2026-07-20
 - [[aws-ops/2026-07-19-iam-grant-revoke-cloudtrail-audit]] — OPA 5번 소명용 IAM 부여·말소 정확 시각을 CloudTrail 원본 로그로 조사, 루트 계정 IAM 작업 사용 발견
 - [[aws-ops/2026-07-19-location-data-write-path-audit]] — OPA 8번 소명용 위치정보 쓰기(수정) 경로 전수 조사, 조회 전용임을 확인 + AppSync 미사용 위경도 필드 발견
 - [[aws-ops/2026-07-20-location-data-ttl-auto-purge-discovery]] — 위치정보 DynamoDB 4개 테이블 전부 TTL 7일 자동 파기 중이었음을 재발견, OPA 12번(파기 소스코드) 대응
+- [[aws-ops/2026-07-20-ttl-under-retention-finding-and-fix]] — TTL 7일이 "이용·제공사실 확인자료" 법정 최소보관(6개월 추정) 미달 가능성 발견, TTL 180일로 코드 수정(미배포)
 - [[aws-ops/2026-07-20-agent-toolkit-setup]] — AWS 공식 Agent Toolkit 설정 (CLI 2.36 업그레이드 + Claude Code용 aws-mcp 연결, macOS 계정 전역 영향 주의)
+- [[aws-ops/2026-07-30-vpc-rds-privatization-design]] — RDS 4대 인터넷 노출(GuardDuty 악성 IP 스캔 탐지) 대응, 완전 사설화 단계별 로드맵 설계 (Phase 0 착수 승인 대기)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결

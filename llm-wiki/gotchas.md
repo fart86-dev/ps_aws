@@ -4,7 +4,7 @@ repo: ps-aws
 domains: []
 stack: [aws-sdk-v3, aws-cli, cloudwatch, node-cron]
 status: active
-updated: 2026-07-20
+updated: 2026-07-30
 ---
 
 # gotchas — 건드리면 터지는 곳
@@ -27,6 +27,41 @@ updated: 2026-07-20
 - dev 인스턴스는 단발 waiter 로 충분할 수도 있지만, 운영 인스턴스에서는 절대 단발 waiter 만 쓰지 말 것.
 
 (이 함정은 자동 메모리 `feedback_aws_rds_waiter_pitfall` 에도 등록되어 있어, 다음 세션에서 동일 작업을 시작할 때 자동 환기됨.)
+
+**적용 메모 (2026-07-30):** RDS 사설화 로드맵 Phase 7(`modify-db-instance --no-publicly-accessible`)도 이 함정에 그대로 해당. rename은 안 하지만 `modify` 후 `available` 확인에 표준 waiter를 쓰면 동일하게 실패할 수 있어 직접 폴링 루프 필수. [[aws-ops/2026-07-30-vpc-rds-privatization-design#phase-7-rds-공개-해제--유일한-다운타임-구간]] 참조.
+
+---
+
+## [AWS] RDS DNS는 split-horizon — 사설화해도 호스트 문자열은 그대로 동작  #gotcha
+
+Default VPC는 `enableDnsSupport`/`enableDnsHostnames`가 켜져 있어, RDS 엔드포인트 FQDN(`*.rds.amazonaws.com`)이 **VPC 내부에서 조회하면 사설 IP, 외부에서 조회하면 공인 IP**로 해석된다(split-horizon DNS).
+
+`PubliclyAccessible=false`로 바꾼 뒤에도 어디서 조회하든 사설 IP만 반환하게 될 뿐, **FQDN 문자열 자체는 그대로 유효하다.** 즉 코드에 하드코딩된 `production-mshuttle-read1.cpbnujantp4n.ap-northeast-2.rds.amazonaws.com` 같은 문자열을 사설화 때문에 고칠 필요는 없다 — 연결 위치(VPC 안/밖)만 맞으면 동작한다.
+
+2026-07-30 RDS 사설화 설계 조사 중 확인. 이 사실 덕분에 "호스트명 교체"와 "평문 비밀번호 제거"를 별개 작업으로 분리할 수 있어 이관 규모가 크게 줄었다. 상세 [[aws-ops/2026-07-30-vpc-rds-privatization-design#3-설계를-바꾼-반전-2개]].
+
+---
+
+## [AWS+src] `ms_sam`은 시크릿을 런타임이 아니라 빌드타임에 번들에 굽는다  #gotcha
+
+`~/psapp` 계열 배포 도구 `ms_sam`은 `secret.cjs`가 Secrets Manager(`{stage}/db/mysql` 등)에서 값을 읽어 `.env.{stage}` 파일로 쓰고, `webpack.config.cjs`의 `BannerPlugin`이 그 값을 **번들 최상단에 평문으로 하드코딩 주입**한다. 런타임 Lambda 핸들러에서 Secrets Manager를 직접 호출하는 코드는 0건(2026-07-30 grep 확인).
+
+**함의:**
+- "Secrets Manager 값만 갱신하면 전체 Lambda에 전파된다"는 가정이 **성립하지 않는다.** 값이 바뀌려면 해당 Lambda를 **rebuild + redeploy** 해야 한다. 마스터 패스워드 로테이션 같은 작업은 순서를 잘못 잡으면(로테이션 먼저, 재배포 나중) 장애로 이어진다.
+- 반대로 Lambda가 VPC 안으로 들어가도 **Secrets Manager Interface VPC 엔드포인트는 불필요**하다 — 애초에 런타임 호출이 없다.
+- **운영 DB 평문 자격증명이 `ms-sam` S3 버킷의 모든 과거 배포 아티팩트(`s3://ms-sam/<service>/<stage>/<timestamp>/`)에 영구히 잔존**한다. git 커밋보다 넓은 노출면이라 버킷 접근 IAM과 라이프사이클 정책을 별도로 점검해야 한다.
+
+상세 및 조치 [[aws-pending#운영-db-평문-자격증명-processenv-로깅-사설화와-무관-즉시-조치]], [[aws-ops/2026-07-30-vpc-rds-privatization-design#3-설계를-바꾼-반전-2개]].
+
+---
+
+## [src] `ms_sam` 파라미터 검증은 양방향 엄격 — config에만 값을 넣으면 배포가 즉시 실패  #gotcha
+
+`ms_sam`의 템플릿 검증(`base-generator.cjs`)은 "템플릿의 모든 파라미터가 config에 있어야 함"뿐 아니라 **"config의 모든 파라미터가 템플릿에도 있어야 함"**까지 양방향으로 검사한다.
+
+따라서 `mssam.config.cjs`의 `additionalParams`에 `SubnetIds`/`SecurityGroupIds` 같은 새 파라미터를 슬쩍 추가해도, 그 옆의 `template.yaml`에 동일 이름의 `Parameters` 선언과 `Globals.Function.VpcConfig`가 없으면 **배포가 그 자리에서 실패**한다. 두 파일을 항상 짝으로 고쳐야 한다.
+
+Lambda를 VPC로 이관하는 작업(RDS 사설화 로드맵 Phase 5)에서 이 패턴이 67개 `template.yaml` 전부에 반복 적용돼야 하므로 codemod 스크립트화가 사실상 강제된다. 상세 [[aws-ops/2026-07-30-vpc-rds-privatization-design#5-2-ms_sam을-준-단일-지점으로-개조-핵심-레버]].
 
 ---
 
