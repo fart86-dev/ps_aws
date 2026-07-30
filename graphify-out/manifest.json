@@ -1,0 +1,347 @@
+{
+  "package.json": {
+    "mtime": 1782351766.154124,
+    "ast_hash": "8748b0d78aa45a86d77f931d5eb72b41",
+    "semantic_hash": "8748b0d78aa45a86d77f931d5eb72b41"
+  },
+  "scripts/check-costs.sh": {
+    "mtime": 1776839651.4314392,
+    "ast_hash": "d83c5bc5bf69a40ff84b95dc5a562d21",
+    "semantic_hash": "d83c5bc5bf69a40ff84b95dc5a562d21"
+  },
+  "scripts/check-resources.sh": {
+    "mtime": 1776839719.1400337,
+    "ast_hash": "26f460969a4e54a9f793616c2c653545",
+    "semantic_hash": "26f460969a4e54a9f793616c2c653545"
+  },
+  "scripts/dev-bg.sh": {
+    "mtime": 1776841629.5332198,
+    "ast_hash": "0275b3fa9480b9515e58478bd23f7e0f",
+    "semantic_hash": "0275b3fa9480b9515e58478bd23f7e0f"
+  },
+  "scripts/start-bg.sh": {
+    "mtime": 1776841634.5154803,
+    "ast_hash": "9fdc1de5d16c8dbd3aff9f69d2c6b61a",
+    "semantic_hash": "9fdc1de5d16c8dbd3aff9f69d2c6b61a"
+  },
+  "scripts/stop.sh": {
+    "mtime": 1776859386.8020558,
+    "ast_hash": "e66371acc9196e6c08acc800e6d01be1",
+    "semantic_hash": "e66371acc9196e6c08acc800e6d01be1"
+  },
+  "scripts/summary.sh": {
+    "mtime": 1776839745.3490093,
+    "ast_hash": "bead0f3f19a7367a113bfd7844b96117",
+    "semantic_hash": "bead0f3f19a7367a113bfd7844b96117"
+  },
+  "src/index.ts": {
+    "mtime": 1776838054.3066864,
+    "ast_hash": "6590d54b410290ad7c506b1a0c4f6735",
+    "semantic_hash": "6590d54b410290ad7c506b1a0c4f6735"
+  },
+  "src/infra-monitor/dynamodb.ts": {
+    "mtime": 1782351722.322641,
+    "ast_hash": "d42fc4e617c55b8f7d9308f7a19ccb37",
+    "semantic_hash": "d42fc4e617c55b8f7d9308f7a19ccb37"
+  },
+  "src/infra-monitor/index.ts": {
+    "mtime": 1776832741.0203743,
+    "ast_hash": "0d335650b73dae1861ba2525809138b5",
+    "semantic_hash": "0d335650b73dae1861ba2525809138b5"
+  },
+  "src/infra-monitor/rds.ts": {
+    "mtime": 1776836504.0428212,
+    "ast_hash": "52cda7383e0f42c00074604b219f9b5f",
+    "semantic_hash": "52cda7383e0f42c00074604b219f9b5f"
+  },
+  "src/infra-monitor/waf.ts": {
+    "mtime": 1776832733.2125635,
+    "ast_hash": "ad258bf522d2f4aa8247db307ce5e9fd",
+    "semantic_hash": "ad258bf522d2f4aa8247db307ce5e9fd"
+  },
+  "src/infra-monitor/waste.ts": {
+    "mtime": 1780301311.7692506,
+    "ast_hash": "fa8092844ef8cabcdba4af9a59606c2f",
+    "semantic_hash": "fa8092844ef8cabcdba4af9a59606c2f"
+  },
+  "src/notifiers/index.ts": {
+    "mtime": 1780301328.4517171,
+    "ast_hash": "591f63c84f93380980cf8e66180e5018",
+    "semantic_hash": "591f63c84f93380980cf8e66180e5018"
+  },
+  "src/notifiers/slack.ts": {
+    "mtime": 1776835203.6403286,
+    "ast_hash": "9639b631f65293349e88e2dd1ad18af3",
+    "semantic_hash": "9639b631f65293349e88e2dd1ad18af3"
+  },
+  "src/notifiers/telegram.ts": {
+    "mtime": 1780301353.045396,
+    "ast_hash": "ba5b7888c674a76e1b7995e765252503",
+    "semantic_hash": "ba5b7888c674a76e1b7995e765252503"
+  },
+  "src/notifiers/types.ts": {
+    "mtime": 1776835099.4309928,
+    "ast_hash": "a1d9c77b5aadabeb4bf7e6449c04f600",
+    "semantic_hash": "a1d9c77b5aadabeb4bf7e6449c04f600"
+  },
+  "src/scheduler/index.ts": {
+    "mtime": 1780301387.035412,
+    "ast_hash": "806ebd18a3f287ff4021feca0c7eb542",
+    "semantic_hash": "806ebd18a3f287ff4021feca0c7eb542"
+  },
+  "src/scripts/rdsStatus.ts": {
+    "mtime": 1780298444.690055,
+    "ast_hash": "084ce9a3187b80ebc5189f331991b729",
+    "semantic_hash": "084ce9a3187b80ebc5189f331991b729"
+  },
+  "src/scripts/wafBotControl.ts": {
+    "mtime": 1780286373.8866959,
+    "ast_hash": "28e61108c26004acac0cacd51e68e2ea",
+    "semantic_hash": "28e61108c26004acac0cacd51e68e2ea"
+  },
+  "src/server.ts": {
+    "mtime": 1780301370.4208364,
+    "ast_hash": "7da9a24046be134de42f03ce699853d5",
+    "semantic_hash": "7da9a24046be134de42f03ce699853d5"
+  },
+  "src/types.ts": {
+    "mtime": 1780308751.17173,
+    "ast_hash": "f8615abcefa043b585860c1875a60ab0",
+    "semantic_hash": "f8615abcefa043b585860c1875a60ab0"
+  },
+  "src/types/node-cron.d.ts": {
+    "mtime": 1776835476.5534048,
+    "ast_hash": "13176d214ea841ed1d72063add5a2557",
+    "semantic_hash": "13176d214ea841ed1d72063add5a2557"
+  },
+  "tsconfig.json": {
+    "mtime": 1776832638.4006329,
+    "ast_hash": "fa7c26ba23ebdad3ac91603656a8f97b",
+    "semantic_hash": "fa7c26ba23ebdad3ac91603656a8f97b"
+  },
+  "AGENTS.md": {
+    "mtime": 1782781801.6334763,
+    "ast_hash": "0b396cd06b75c8499417add983c244df",
+    "semantic_hash": "0b396cd06b75c8499417add983c244df"
+  },
+  "CLAUDE.md": {
+    "mtime": 1782424711.8505402,
+    "ast_hash": "0b396cd06b75c8499417add983c244df",
+    "semantic_hash": "0b396cd06b75c8499417add983c244df"
+  },
+  "README.md": {
+    "mtime": 1782351752.0731094,
+    "ast_hash": "b9bc4f3672c0b8a89555ac36e2f82955",
+    "semantic_hash": "b9bc4f3672c0b8a89555ac36e2f82955"
+  },
+  "docs/process-management.md": {
+    "mtime": 1776894027.8200827,
+    "ast_hash": "3e92ffa7971a9afb66d5106b4ad11aaf",
+    "semantic_hash": "3e92ffa7971a9afb66d5106b4ad11aaf"
+  },
+  "llm-wiki/aws-agent-toolkit-rules.md": {
+    "mtime": 1784529822.5025465,
+    "ast_hash": "47fd79ec0c22a2b278fab49110dab086",
+    "semantic_hash": "47fd79ec0c22a2b278fab49110dab086"
+  },
+  "llm-wiki/aws-inventory/cloudfront-dev-admin.md": {
+    "mtime": 1782424570.1333349,
+    "ast_hash": "043efe0aff5112c446672fc4376a0f20",
+    "semantic_hash": "043efe0aff5112c446672fc4376a0f20"
+  },
+  "llm-wiki/aws-inventory/protected-resources.md": {
+    "mtime": 1784377519.4368346,
+    "ast_hash": "94f9e733b907d7b65ffe9abd96da1a29",
+    "semantic_hash": "94f9e733b907d7b65ffe9abd96da1a29"
+  },
+  "llm-wiki/aws-ops/2026-06-01-vpc-ec2-cleanup.md": {
+    "mtime": 1782424115.8524973,
+    "ast_hash": "b82682f956c2e0a438d54343e265a9ac",
+    "semantic_hash": "b82682f956c2e0a438d54343e265a9ac"
+  },
+  "llm-wiki/aws-ops/2026-06-02-kms-madmin-cleanup.md": {
+    "mtime": 1782424174.8297868,
+    "ast_hash": "9f5ca45858a75cf85f17b6f762721182",
+    "semantic_hash": "9f5ca45858a75cf85f17b6f762721182"
+  },
+  "llm-wiki/aws-ops/2026-06-02-lambda-edge-cleanup.md": {
+    "mtime": 1782424146.8881347,
+    "ast_hash": "1e4458e6d3097d2b6a0526a6eaf06489",
+    "semantic_hash": "1e4458e6d3097d2b6a0526a6eaf06489"
+  },
+  "llm-wiki/aws-ops/2026-06-03-read-replica-az-migration.md": {
+    "mtime": 1782424218.52602,
+    "ast_hash": "7057dd99abfd6a762ce57712862004b8",
+    "semantic_hash": "7057dd99abfd6a762ce57712862004b8"
+  },
+  "llm-wiki/aws-ops/2026-06-04-apigw-exec-log-cleanup.md": {
+    "mtime": 1782424288.015251,
+    "ast_hash": "5d102841c87477caff58df7f4bc0c9fa",
+    "semantic_hash": "5d102841c87477caff58df7f4bc0c9fa"
+  },
+  "llm-wiki/aws-ops/2026-06-04-msdeveloper-s3-lifecycle.md": {
+    "mtime": 1782424259.2876952,
+    "ast_hash": "152b380f50945b268ab9b4cd39739aec",
+    "semantic_hash": "152b380f50945b268ab9b4cd39739aec"
+  },
+  "llm-wiki/aws-ops/2026-06-16-cloudfront-admin-function-attach.md": {
+    "mtime": 1782424328.19783,
+    "ast_hash": "60618a83d50abb36337faf332c0c2ef2",
+    "semantic_hash": "60618a83d50abb36337faf332c0c2ef2"
+  },
+  "llm-wiki/aws-ops/2026-07-01-dynamodb-drv-runn-cleanup.md": {
+    "mtime": 1782950103.0661936,
+    "ast_hash": "83562b3bf2d49646acf0623d73e180f5",
+    "semantic_hash": "83562b3bf2d49646acf0623d73e180f5"
+  },
+  "llm-wiki/aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten.md": {
+    "mtime": 1782887980.798502,
+    "ast_hash": "0640b55def047555c9e48d7d88294c90",
+    "semantic_hash": "0640b55def047555c9e48d7d88294c90"
+  },
+  "llm-wiki/aws-ops/2026-07-01-pinpoint-mobilehub-cleanup.md": {
+    "mtime": 1782869129.6266756,
+    "ast_hash": "2957c43cda682b7f1323bacd97656778",
+    "semantic_hash": "2957c43cda682b7f1323bacd97656778"
+  },
+  "llm-wiki/aws-ops/2026-07-02-dynamodb-recovery-and-lessons.md": {
+    "mtime": 1782950090.6961553,
+    "ast_hash": "2f8693b5612a18cfd2225aa0ae372c22",
+    "semantic_hash": "2f8693b5612a18cfd2225aa0ae372c22"
+  },
+  "llm-wiki/aws-ops/2026-07-06-cognito-amplify-audit.md": {
+    "mtime": 1784290227.0209363,
+    "ast_hash": "982e933cbff2b7945894ae9d618f910a",
+    "semantic_hash": "982e933cbff2b7945894ae9d618f910a"
+  },
+  "llm-wiki/aws-ops/2026-07-06-staging-cleanup.md": {
+    "mtime": 1784290227.02124,
+    "ast_hash": "3f6e9693586bfe1d24fde8095bda32e4",
+    "semantic_hash": "3f6e9693586bfe1d24fde8095bda32e4"
+  },
+  "llm-wiki/aws-ops/2026-07-17-dynamodb-location-encryption-audit.md": {
+    "mtime": 1784406678.2621324,
+    "ast_hash": "8340861b6d092086ed5685387a008dc8",
+    "semantic_hash": "8340861b6d092086ed5685387a008dc8"
+  },
+  "llm-wiki/aws-ops/2026-07-18-dynamodb-stream-consumer-audit.md": {
+    "mtime": 1784349393.304,
+    "ast_hash": "61809870cb2a119b1ff141a376aad22e",
+    "semantic_hash": "61809870cb2a119b1ff141a376aad22e"
+  },
+  "llm-wiki/aws-ops/2026-07-18-guardduty-enable.md": {
+    "mtime": 1784377545.938898,
+    "ast_hash": "04c28795800b5ff2fa9aaa13cae1e16b",
+    "semantic_hash": "04c28795800b5ff2fa9aaa13cae1e16b"
+  },
+  "llm-wiki/aws-ops/2026-07-18-khj-dev-offboarding.md": {
+    "mtime": 1784381056.771095,
+    "ast_hash": "b479832bf1708c0f37d52476ab7c5455",
+    "semantic_hash": "b479832bf1708c0f37d52476ab7c5455"
+  },
+  "llm-wiki/aws-ops/2026-07-19-iam-grant-revoke-cloudtrail-audit.md": {
+    "mtime": 1784452550.0139935,
+    "ast_hash": "0ef7d29c97099f7d4a8ae3814b25b2f7",
+    "semantic_hash": "0ef7d29c97099f7d4a8ae3814b25b2f7"
+  },
+  "llm-wiki/aws-ops/2026-07-19-location-data-write-path-audit.md": {
+    "mtime": 1784506815.9862587,
+    "ast_hash": "006023f361e33078ec7f3f9aea28260c",
+    "semantic_hash": "006023f361e33078ec7f3f9aea28260c"
+  },
+  "llm-wiki/aws-ops/2026-07-20-agent-toolkit-setup.md": {
+    "mtime": 1784529971.810012,
+    "ast_hash": "fcd59df1eeae27fd34821638a4219564",
+    "semantic_hash": "fcd59df1eeae27fd34821638a4219564"
+  },
+  "llm-wiki/aws-ops/2026-07-20-location-data-ttl-auto-purge-discovery.md": {
+    "mtime": 1784538143.3649251,
+    "ast_hash": "e33c43c86ae3b510306b76553e8bfc78",
+    "semantic_hash": "e33c43c86ae3b510306b76553e8bfc78"
+  },
+  "llm-wiki/aws-ops/2026-07-20-ttl-under-retention-finding-and-fix.md": {
+    "mtime": 1784540279.0567904,
+    "ast_hash": "803d02312b93231065ce1fa3c737820b",
+    "semantic_hash": "803d02312b93231065ce1fa3c737820b"
+  },
+  "llm-wiki/aws-ops/2026-07-30-vpc-rds-privatization-design.md": {
+    "mtime": 1785400665.7871375,
+    "ast_hash": "4268ca57b1a46a141d631d1f447a100b",
+    "semantic_hash": "4268ca57b1a46a141d631d1f447a100b"
+  },
+  "llm-wiki/aws-pending.md": {
+    "mtime": 1785400699.8771162,
+    "ast_hash": "53d1f37be36195b2a69bb6ce90e7609f",
+    "semantic_hash": "53d1f37be36195b2a69bb6ce90e7609f"
+  },
+  "llm-wiki/aws-runbooks/cloudfront-function-attach.md": {
+    "mtime": 1782424461.7917666,
+    "ast_hash": "cff0feec88be538e991130c673b1630d",
+    "semantic_hash": "cff0feec88be538e991130c673b1630d"
+  },
+  "llm-wiki/aws-runbooks/rds-shrink-migration.md": {
+    "mtime": 1782424420.3601294,
+    "ast_hash": "c8d01eac41a39ddbbdf546686bfabf7f",
+    "semantic_hash": "c8d01eac41a39ddbbdf546686bfabf7f"
+  },
+  "llm-wiki/aws-runbooks/waf-bot-control-toggle.md": {
+    "mtime": 1782424491.0014637,
+    "ast_hash": "c6a1c83320e677595c92abaa8a4f46b5",
+    "semantic_hash": "c6a1c83320e677595c92abaa8a4f46b5"
+  },
+  "llm-wiki/conventions.md": {
+    "mtime": 1782350691.3896723,
+    "ast_hash": "1222e0a92be8050c82f96fe5c73f008a",
+    "semantic_hash": "1222e0a92be8050c82f96fe5c73f008a"
+  },
+  "llm-wiki/decisions.md": {
+    "mtime": 1782424847.6191967,
+    "ast_hash": "16db71224f2bea85a72536ddba9026de",
+    "semantic_hash": "16db71224f2bea85a72536ddba9026de"
+  },
+  "llm-wiki/domains/cost-waste.md": {
+    "mtime": 1782350873.685916,
+    "ast_hash": "7cf0f2ec7a713575b453fa135dc48365",
+    "semantic_hash": "7cf0f2ec7a713575b453fa135dc48365"
+  },
+  "llm-wiki/domains/infra-health.md": {
+    "mtime": 1782351857.268306,
+    "ast_hash": "652623bcd17025bfe3e447c4a9ef701e",
+    "semantic_hash": "652623bcd17025bfe3e447c4a9ef701e"
+  },
+  "llm-wiki/domains/notifiers.md": {
+    "mtime": 1782350952.4579802,
+    "ast_hash": "19241607dcefc6ba08481229c957035c",
+    "semantic_hash": "19241607dcefc6ba08481229c957035c"
+  },
+  "llm-wiki/domains/rds-status.md": {
+    "mtime": 1782350923.6622903,
+    "ast_hash": "e6be1ed651b3206c0afbe239a794b4ea",
+    "semantic_hash": "e6be1ed651b3206c0afbe239a794b4ea"
+  },
+  "llm-wiki/domains/waf-bot-control.md": {
+    "mtime": 1782350897.9375205,
+    "ast_hash": "2e9005e448ecd21c1ca8f1445b03e44c",
+    "semantic_hash": "2e9005e448ecd21c1ca8f1445b03e44c"
+  },
+  "llm-wiki/gotchas.md": {
+    "mtime": 1785400729.2839096,
+    "ast_hash": "50757797b0ae7c4bf5d526c980bf6d6a",
+    "semantic_hash": "50757797b0ae7c4bf5d526c980bf6d6a"
+  },
+  "llm-wiki/index.md": {
+    "mtime": 1785400752.4938276,
+    "ast_hash": "946eff0a67b9d664ca9b3da86b80d701",
+    "semantic_hash": "946eff0a67b9d664ca9b3da86b80d701"
+  },
+  "llm-wiki/runbook.md": {
+    "mtime": 1782424851.2029514,
+    "ast_hash": "3011c02cae7d705899784fd69e8f59b2",
+    "semantic_hash": "3011c02cae7d705899784fd69e8f59b2"
+  },
+  "llm-wiki/structure.md": {
+    "mtime": 1782424694.8029597,
+    "ast_hash": "932680fdb6332cee9d9805bd70203742",
+    "semantic_hash": "932680fdb6332cee9d9805bd70203742"
+  }
+}
