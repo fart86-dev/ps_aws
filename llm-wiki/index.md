@@ -5,7 +5,7 @@ domains: []
 stack: [aws-cli, aws-sdk-v3, fastify, typescript, node-cron, tsx]
 status: active
 bus_factor: 1
-updated: 2026-07-30
+updated: 2026-08-16
 ---
 
 # ps-aws 위키
@@ -47,8 +47,10 @@ updated: 2026-07-30
 - [[aws-ops/2026-07-20-ttl-under-retention-finding-and-fix]] — TTL 7일이 "이용·제공사실 확인자료" 법정 최소보관(6개월 추정) 미달 가능성 발견, TTL 180일로 코드 수정(미배포)
 - [[aws-ops/2026-07-20-agent-toolkit-setup]] — AWS 공식 Agent Toolkit 설정 (CLI 2.36 업그레이드 + Claude Code용 aws-mcp 연결, macOS 계정 전역 영향 주의)
 - [[aws-ops/2026-07-30-vpc-rds-privatization-design]] — RDS 4대 인터넷 노출(GuardDuty 악성 IP 스캔 탐지) 대응, 완전 사설화 단계별 로드맵 설계 (Phase 0 착수 승인 대기)
+- [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade]] — production-mshuttle/read1 MySQL 8.4.5→8.4.9 인플레이스 업그레이드 (AWS Health 마이너 버전 지원종료 대응, 완료)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
+  - [[aws-runbooks/rds-mysql-minor-version-upgrade]] — RDS MySQL 마이너 버전 인플레이스 업그레이드
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결
   - [[aws-runbooks/waf-bot-control-toggle]] — WAF Bot Control rule 토글
 - 현재 상태 인벤토리:

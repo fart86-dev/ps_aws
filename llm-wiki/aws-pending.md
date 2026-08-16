@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-07-30
+last_updated: 2026-08-16
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -436,6 +436,32 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 
 ---
 
+## RDS for MySQL 마이너 버전 지원 종료 (AWS Health 공지, 2026-08-14 수신)
+
+**상태:** ✅ 완료 (2026-08-16)
+
+**대상:** `production-mshuttle`, `production-mshuttle-read1` (둘 다 MySQL 8.4.5, 파라미터 그룹 `params-production-mysql84` 공유, MultiAZ 아님). `dev-mshuttle`(8.4.9)은 해당 없음, `spd-test`는 postgres라 무관.
+
+**왜:** AWS Health 공지 — RDS for MySQL 마이너 버전 8.4.5, 8.4.6, 5.7.44-RDS.20250213/0508/0818이 **2026-10-31 표준 지원 종료**. 계정 실측(2026-08-14)으로 production 2대가 8.4.5임을 확인, 공지 대상에 해당함.
+
+**일정:**
+- 2026-10-01~: 해당 마이너 버전으로 신규 인스턴스 생성 불가 (기존 인스턴스는 무관)
+- 2026-10-31 이후 예정된 유지관리 기간 중: AWS가 production-mshuttle / read1을 **자동으로** 8.4.8(또는 그 이상)로 강제 업그레이드 — **다운타임 발생**. 선제 조치 없으면 다운타임 시점·방식을 AWS 유지관리 창에 맡기게 됨.
+
+**잠재 효과:** 메이저 버전 변경 아님(8.4.x 내 마이너 업그레이드)이라 호환성 리스크는 낮은 편이나, production 다운타임은 불가피 — 수동 선제 업그레이드로 시점을 통제할지, AWS 자동 업그레이드에 맡길지가 핵심 결정.
+
+**소요 시간 검토 (2026-08-14):** 메이저 버전 변경이 아니라 작업량 자체는 크지 않음. 두 방식의 트레이드오프:
+- **인플레이스 업그레이드(`modify-db-instance`):** 실행은 짧지만, 두 인스턴스 모두 `MultiAZ: false`라 적용 시 재부팅에 따른 실다운타임 발생(통상 수 분 단위, 정확한 시간은 실행해봐야 확인 가능). 관건은 트래픽 낮은 시간대 선택.
+- **Blue/Green Deployment (AWS 권장):** 전환 순간 다운타임은 훨씬 짧지만(초 단위), green 환경 생성·복제 캐치업·검증까지 준비 시간이 반나절~하루 정도 필요. production 대상이라 롤백 안전망 있는 이쪽이 더 안전.
+- **순서:** read replica(`production-mshuttle-read1`)를 source(`production-mshuttle`)보다 먼저(또는 같이) 올리는 게 일반적 권장 순서.
+- **시급성 낮음:** 지원 종료(2026-10-31)까지 약 2.5개월 여유 — 지금 당장 서두를 필요는 없음.
+
+**결정 (2026-08-16):** 인플레이스 업그레이드로 진행. dev-mshuttle이 8.4.9로 오래 안정적으로 운영된 이력을 8.4.x 라인 검증 근거로 판단, Blue/Green 없이 바로 진행하기로 함. 실행 시점은 **오늘밤~내일 새벽**(사람이 적은 시간대) — 사용자가 해당 시간대면 다운타임 영향 충분히 낮다고 판단.
+
+**결과 (2026-08-16 실행):** 양쪽 다 8.4.9로 업그레이드 완료. 실다운타임 — replica 약 2분 37초, source 약 2분 20초. 절차·이벤트 로그 [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade]] 참조. 스냅샷 `production-mshuttle-pre-8-4-9-upgrade-2026-08-16`은 1~2주 안정화 후 정리 여부 결정 필요.
+
+---
+
 ## 운영 DB 평문 자격증명 · process.env 로깅 (사설화와 무관, 즉시 조치)
 
 **상태:** 🔴 즉시 조치 필요 (사설화 로드맵보다 급함)
@@ -457,6 +483,22 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 
 ---
 
+## CloudShell 홈 디렉토리 삭제 예정 (ap-northeast-2, 120일 미사용)
+
+**상태:** ⏳ 2026-08-25 시한 (AWS Health 공지, 2026-08-16 수신)
+
+**대상:** ap-northeast-2 리전에서 CloudShell을 110일+ 미사용한 사용자들의 CloudShell 홈 디렉토리(개인 스토리지). 대상 사용자 목록은 Health Dashboard "Affected Resources" 탭(콘솔 전용, API 조회 불가 — Business/Enterprise 지원 플랜 필요, RDS Health 조회 때와 동일 제약).
+
+**왜:** AWS가 120일 미사용 CloudShell 홈 디렉토리를 2026-08-25에 자동 삭제 예정. 저장된 개인 스크립트/파일이 있으면 유실.
+
+**잠재 효과:** 낮음 — RDS/DynamoDB 등 실제 데이터 자산과 무관한 개인 스토리지. 이 계정 작업 방식이 로컬 CLI/aws-mcp 위주라 ap-northeast-2 CloudShell에 중요한 걸 저장해둔 사람이 있을 가능성 낮다고 판단(2026-08-16).
+
+**다음 행동:**
+- 콘솔에서 Health Dashboard "Affected Resources" 확인 → 실제로 저장해둔 게 있는 사용자 있으면 2026-08-25 전에 해당 계정으로 CloudShell 한 번 실행(삭제 취소됨)
+- 아무도 안 쓰는 것 같으면 별도 조치 없이 흘려보내도 무방
+
+---
+
 ## (참고) 완료된 작업
 
 - ✅ 2026-06-01 VPC/EC2/SG/EIP/ENI/AMI/Snapshot/Glue/DataZone 정리 → [[aws-ops/2026-06-01-vpc-ec2-cleanup]]
@@ -470,3 +512,4 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 - ✅ 2026-07-01 msdeveloper STD 30→7일 단축 (-$40/월 예상) → [[aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten]]
 - ✅ 2026-07-01 DynamoDB drv_runn_*_production 5개 삭제 (-$25/월) → [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]]
 - ✅ 2026-07-02 DynamoDB dev 4개 오삭제 복구 및 재발 방지 (순 절감 -$34/월) → [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]]
+- ✅ 2026-08-16 RDS for MySQL 마이너 버전 인플레이스 업그레이드 8.4.5 → 8.4.9 (AWS Health 지원종료 대응) → [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade]]

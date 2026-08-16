@@ -77,6 +77,8 @@ RDS 4대가 인터넷에 노출된 상태를 사설망으로 옮기기 위한 �
 - `production-mshuttle`만 audit/error/general/slowquery 로그 export 중. 나머지 3대는 소스 IP 확인 수단 없음
 - `production-mshuttle`은 `DeletionProtection=true` (보호 자원)
 
+> **갱신 메모 (2026-08-16):** `production-mshuttle`/`production-mshuttle-read1`의 Engine 버전은 8.4.5 → **8.4.9**로 업그레이드됨 (AWS Health 마이너 버전 지원종료 대응, [[2026-08-16-rds-mysql-minor-version-upgrade]]). 위 표는 2026-07-30 시점 스냅샷이라 그대로 두되, 네트워크/보안 관련 설계 내용(사설화 로드맵)은 이번 변경과 무관하게 유효.
+
 ### 2-5. 접속 주체 — 차단의 유일한 경로
 
 **Lambda 151개 중 VPC 연결은 6개뿐.** 나머지 **145개가 VPC 밖**에서 RDS 퍼블릭 엔드포인트로 붙는다.

@@ -4,7 +4,7 @@ repo: ps-aws
 domains: []
 stack: [aws-sdk-v3, aws-cli, cloudwatch, node-cron]
 status: active
-updated: 2026-07-30
+updated: 2026-08-16
 ---
 
 # gotchas — 건드리면 터지는 곳
@@ -350,6 +350,26 @@ IAM 사용자 삭제 순서를 그룹 탈퇴 → 액세스키 삭제 → SSH키 
 8. `delete-user`
 
 퇴사자 오프보딩처럼 반복될 작업이라 순서를 기억해둘 것.
+
+---
+
+## [AWS] RDS 스냅샷/인스턴스 identifier는 마침표 금지  #gotcha
+
+`aws rds create-db-snapshot --db-snapshot-identifier`(인스턴스 identifier도 동일)는 letters/digits/hyphens만 허용 — `.`(마침표)가 들어가면 `InvalidParameterValue`로 즉시 거부된다.
+
+버전 문자열(예: `8.4.9`)을 identifier에 그대로 넣고 싶어질 때 특히 걸리기 쉽다 — `production-mshuttle-pre-8.4.9-upgrade`는 실패, `production-mshuttle-pre-8-4-9-upgrade`로 점을 하이픈으로 바꿔야 함.
+
+2026-08-16 RDS MySQL 마이너 버전 업그레이드 작업 중 실제로 이 에러를 맞고 정정함. 상세 [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade#2-step-1-production-mshuttle-수동-스냅샷-완료]], 절차 [[aws-runbooks/rds-mysql-minor-version-upgrade]].
+
+---
+
+## [AWS] RDS 마이너 버전 업그레이드: 실다운타임 vs `DBInstanceStatus available` 반영 시점 사이 큰 격차  #gotcha
+
+`modify-db-instance --engine-version --apply-immediately`로 마이너 버전을 올리면, `describe-events`로 보이는 실제 다운타임(`DB instance shutdown` ~ `DB instance restarted`)은 수 분(2~3분) 수준으로 짧다. 그런데 `DBInstanceStatus`가 `upgrading` → `configuring-enhanced-monitoring` → (Enhanced Monitoring/Performance Insights 사용 인스턴스는) `modifying` → `available`로 완전히 전환되기까지는 총 30~40분까지 걸릴 수 있다 — 엔진 업그레이드 자체(`engine version upgrade finished` 이벤트)는 훨씬 먼저 끝나 있는데도 그렇다.
+
+**함의:** "언제 다운타임이 끝나는가"(애플리케이션 영향 관점)와 "언제 API가 `available`을 보고하는가"(자동화 스크립트가 기다리는 조건)가 다르다. 자동화에서 `wait db-instance-available`로 다음 단계(예: source 업그레이드)를 게이팅하면 실제로 필요한 것보다 훨씬 오래 기다리게 될 수 있음 — 실다운타임 종료 확인이 목적이면 `describe-events`의 `DB instance restarted` 이벤트를 보는 게 더 빠른 신호.
+
+2026-08-16 production-mshuttle/read1 업그레이드에서 실측(둘 다 실다운타임 2~3분, `available` 반영까지는 30~40분). 상세 [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade#8-관찰-사항]].
 
 ---
 
