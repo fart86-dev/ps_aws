@@ -5,7 +5,7 @@ domains: []
 stack: [aws-cli, aws-sdk-v3, fastify, typescript, node-cron, tsx]
 status: active
 bus_factor: 1
-updated: 2026-08-16
+updated: 2026-08-18
 ---
 
 # ps-aws 위키
@@ -48,6 +48,10 @@ updated: 2026-08-16
 - [[aws-ops/2026-07-20-agent-toolkit-setup]] — AWS 공식 Agent Toolkit 설정 (CLI 2.36 업그레이드 + Claude Code용 aws-mcp 연결, macOS 계정 전역 영향 주의)
 - [[aws-ops/2026-07-30-vpc-rds-privatization-design]] — RDS 4대 인터넷 노출(GuardDuty 악성 IP 스캔 탐지) 대응, 완전 사설화 단계별 로드맵 설계 (Phase 0 착수 승인 대기)
 - [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade]] — production-mshuttle/read1 MySQL 8.4.5→8.4.9 인플레이스 업그레이드 (AWS Health 마이너 버전 지원종료 대응, 완료)
+- [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]] — admin-dev-restapi 하드코딩 키 제거 파일럿 중 webpack DefinePlugin이 시크릿 유출+Lambda 자격증명 체인을 깨뜨리는 구조 발견·수정 (15개+ 리포 영향 가능성 있는 별도 이슈로 확대)
+- [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]] — admin-dev-restapi에 dispatch-one-time EventBridge 규칙 조회 API(`/eventbridge/list`) 신설, admin_doc 스펙 저작부터 dev+production 배포까지 완료
+- [[aws-ops/2026-08-18-dispatch-one-time-rule-cleanup-failure-investigation]] — 2026-04-22 규칙이 안 지워진 이유 조사, 자기정리 로직 결함 발견 + kimps 키 하드코딩 부수 발견
+- [[aws-ops/2026-08-18-admin-dev-restapi-eventbridge-delete]] — admin-dev-restapi에 EventBridge 규칙 삭제 API(`DELETE /eventbridge`) 신설, dev+production 배포 완료 (등록/생성 기능은 보류)
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/rds-mysql-minor-version-upgrade]] — RDS MySQL 마이너 버전 인플레이스 업그레이드
@@ -55,6 +59,8 @@ updated: 2026-08-16
   - [[aws-runbooks/waf-bot-control-toggle]] — WAF Bot Control rule 토글
 - 현재 상태 인벤토리:
   - [[aws-inventory/cloudfront-dev-admin]] — dev-admin-* Distribution 현황
+  - [[aws-inventory/admin-dev-restapi-iam]] — custom-lambda-role-{production,dev} 부착 정책 인벤토리 (신규 정책 2건 포함, 57+54개 함수 공유 확인됨)
+  - [[aws-inventory/iam-overview]] ★ 계정 전체 IAM 현황(사용자 15명·그룹 14명·공용 Lambda role) 정리
 
 ### 2) src/ 보조 도구 (코드 만질 때만)
 
@@ -68,6 +74,7 @@ updated: 2026-08-16
   - [[domains/cost-waste]] — 낭비 자원 검출 + 주간 리포트 (주간 트리거)
   - [[domains/waf-bot-control]] — WAF Bot Control 룰 on/off 일회성 스크립트
   - [[domains/rds-status]] — RDS 인벤토리·메트릭·findings 일회성 스크립트
+  - [[domains/dispatch-rules-status]] — dispatch-one-time-* EventBridge 규칙 발동 여부 점검 스크립트
   - [[domains/notifiers]] — Telegram/Slack 알림 채널 추상화
 
 ---

@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-08-16
+last_updated: 2026-08-18
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -337,25 +337,71 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 
 ---
 
-## cron_serv/driver-runn-cron 하드코딩 AWS 액세스 키 — 소유자 특정 완료
+## cron_serv/driver-runn-cron 하드코딩 AWS 액세스 키 — 규모 재확인 (70개+ 파일, psapp 백엔드 전체)
 
-**상태:** 🟡 사용자 결정 대기 (보안 — 회전/IAM Role 전환 필요)
+**상태:** 🔴 규모 확대 확인 — 사용자 결정 대기 (보안 — 회전/IAM Role 전환 필요, 대규모)
 
-**대상:** `~/sl/cron_serv`, `~/psapp/serv/cron_serv`, `~/psapp/cron/driver-runn-cron`의 12개 이상 파일에 AWS Access Key/Secret이 하드코딩.
+**대상 (2026-08-17 재조사로 대폭 확대):** `AKIAUOUWAIC46JCDIJF6`(fart86, `AdministratorAccess`) 기준 grep 결과 **70개 이상 파일**, `~/psapp`와 `~/sl` 양쪽 트리 전체:
+- `~/psapp/admin/be/*` — admin-dev-restapi, admin-etc-restapi, admin-rtmake-restapi, admin-channel-restapi, admin-driver-restapi, admin-task-restapi, admin-runngroup-restapi, admin-pay-restapi, admin-runn-restapi, admin-rt-restapi, admin-dispatchcase-restapi, admin-board-restapi, admin-user-restapi, admin-msgmanager-restapi 등 15개+
+- `~/psapp/user/be/*` — user-biz-restapi, user-common-restapi, user-make-restapi, user_serv(구세대)
+- `~/psapp/serv/cron_serv/*`, `~/psapp/cron/*` — 기존에 파악한 12곳 포함
+- `~/sl/*` — 구세대 모노레포(`admin_serv`, `admin_ex_serv`, `cron_serv`, `awsinfra` 등) 동일 키로 전면 오염
+- 서비스 범위: RDS start/stop, S3, Kinesis, Athena, Lambda invoke, CloudWatch, WAF, SES(msg) 등 거의 모든 AWS 서비스 접점
 
-**왜:** khj.dev 오프보딩([[aws-ops/2026-07-18-khj-dev-offboarding]]) 조사 중 실제 키 ID로 전수 검색해서 소유자 특정:
-- `AKIAUOUWAIC4676HY4KB` = **kimps** (`runnstatus/handler.ts`, `runnstatus/eventBridge.ts`)
-- `AKIAUOUWAIC46JCDIJF6` = **fart86** (`infra/config.ts`, `board/aws.ts`, `evtgateway/aws.ts`, `watch/*`, **`runn/S3Export.ts`(위치정보 야간 익스포트)**, `runn/athena.ts`, `runn/s3.ts`, `driver-runn-cron` 4개 파일 등 12곳 이상)
-- `AKIAUOUWAIC4WUMHB5VD` = **email** (`cron-common/SendEmailService.ts`)
+**추가 발견:**
+- `AKIAUOUWAIC46JCDIJF6` **생성일 2024-12-28** — CLAUDE.md에 기록된 "계정 마비 사고" 당일. 사고 복구 과정에서 발급된 키가 그대로 전 코드베이스에 박힌 것으로 추정(미확인, 추측 표시).
+- fart86 소유의 **또 다른 활성 키 `AKIAJY6O2CCORSXENWPQ`(생성 2019-01-13, 7년+)** 존재 — 코드 grep으로는 하드코딩 위치 못 찾음. 별도 orphan 키 정리 후보([[#kms-test_key_1]]류와 유사 패턴, 사용처 확인 필요).
+- `~/psapp`, `~/sl` 둘 다 2026-01~08 최근까지 커밋 활발 — **죽은 코드 아님, 실사용 중.**
+- `admin-dev-restapi`의 `src/utils/rds.ts`/`file.utils.ts`는 이미 git 커밋됨(`1c2ff0b`) — 다른 리포들도 커밋 여부 개별 확인 필요(미확인).
 
-fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이프라인이 이 계정 키로 동작 중이라는 뜻.
+**왜 원래 항목보다 훨씬 큰가:** 기존 khj.dev 오프보딩 조사([[aws-ops/2026-07-18-khj-dev-offboarding]])는 `cron_serv`/`driver-runn-cron` 범위만 grep했음. 2026-08-17 `admin-dev-restapi` AWS 인증 코드 확인 중 우연히 같은 키를 재발견해 전체 psapp/sl 트리로 grep 범위를 넓혔더니 실제 규모가 12곳이 아니라 70곳+ 이었음.
 
-**잠재 효과:** 장기 자격증명 하드코딩은 유출 시 계정 전체 장악 위험. IAM Role 기반(Lambda 실행 역할)으로 전환하는 게 표준.
+**키 소유자 원본 정보 (khj.dev 오프보딩 조사, 2026-07-18):**
+- `AKIAUOUWAIC4676HY4KB` = **kimps**
+- `AKIAUOUWAIC46JCDIJF6` = **fart86** (`AdministratorAccess`, 이번 재조사 대상)
+- `AKIAUOUWAIC4WUMHB5VD` = **email**
+
+**잠재 효과:** 장기 자격증명(그것도 `AdministratorAccess`) 하드코딩이 유출 시 계정 전체 장악 위험. 단순 로테이션이 안 되는 이유: `ms_sam` 배포 툴체인이 시크릿을 빌드타임에 webpack `BannerPlugin`으로 번들에 굽는 구조라서, 코드 수정만으론 전파 안 되고 **로테이션 전 전량 재배포 순서를 지켜야** 장애 없음.
+
+**규모 판단 (2026-08-17):** 이건 코드 몇 줄 수정이 아니라 **psapp 백엔드 전체의 AWS 인증 방식을 IAM Role 기반으로 전환하는 별도 프로젝트** 급. RDS 사설화 로드맵(수개월 규모)과 비슷하거나 그 이상. 이 ps_aws 리포 범위 밖 — 별도 프로젝트로 분리 필요.
+
+**다음 행동 (실행은 별도 세션/프로젝트로 분리, 2026-08-17 사용자 결정):**
+1. 각 Lambda 실행 역할(IAM Role)에 필요한 권한(RDS/S3/Kinesis/Athena/Lambda invoke/CloudWatch/WAF/SES)이 이미 있는지 확인 → 없으면 부여
+2. 70개+ 파일에서 `credentials: { accessKeyId, secretAccessKey }` 블록 제거 → SDK 기본 체인(role 자동 사용)으로 전환 — 패턴이 거의 동일해 codemod 스크립트 일괄 처리 가능해 보임(미검증)
+3. 전량 재배포 (기존 배포 아티팩트엔 여전히 평문 키 존재 — 코드 수정만으론 무효)
+4. `AKIAUOUWAIC46JCDIJF6` 모든 소비자 role 전환 확인 후 deactivate → 관찰 → delete
+5. `AKIAJY6O2CCORSXENWPQ`(7년 orphan) 별도 사용처 확인 후 정리 검토
+6. git 히스토리에 남은 평문 키 정리는 우선순위 낮음(로테이션되면 무력화) — 필요 시 리포별 history rewrite
+
+**진행 상황 — `admin-dev-restapi` 파일럿 완료 (2026-08-17, production+dev 스택 모두 배포·검증 끝):**
+- IAM 정책 `admin-dev-restapi-rds-dev-control` 생성(`dev-mshuttle` 전용, Describe/Start/Stop만) → `custom-lambda-role-production`과 `custom-lambda-role-dev` 양쪽에 부착 완료. production-mshuttle은 물리적으로 불가.
+  - 실제 코드 사용 범위 확인: `controller/rds.ts`가 애초에 `dev-mshuttle`/`staging-mshuttle`만 허용(production 진입 자체가 코드상 불가). `staging-mshuttle`은 이미 폐기되어 미존재 → 실질 대상은 `dev-mshuttle` 하나.
+- `src/utils/rds.ts`에서 하드코딩 credentials 블록 제거 → 코드 자체는 문제없었으나, **배포 후 별개의 훨씬 큰 문제(webpack `DefinePlugin`이 `process.env`를 통째로 얼려서 Lambda 기본 자격증명 체인이 깨짐 + 로컬 셸 시크릿 전체가 배포 번들에 유출)를 발견·수정** — 상세 [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]], gotcha [[gotchas#awssrc-webpack-defineplugin이-processenv를-통째로-얼려서-lambda-기본-자격증명-체인을-깨뜨림]].
+- **최종 결과:** production 배포(04:06:46 UTC) 정상 확인(에러 0건), dev 스택도 동일 정책 부착 후 정상 확인. `dev-mshuttle`이 양쪽 관리자 화면에 정상 표시됨.
+- **후속으로 남은 것:**
+  - 이 webpack DefinePlugin 패턴이 `admin-etc-restapi` 등 15개+ 리포 공통 보일러플레이트라 전부 영향 가능성 — 아래 신규 항목([[#webpack-defineplugin이-processenv-경유로-로컬-셸-시크릿-전체를-배포-번들에-유출-15개-리포-영향-가능성]]) 참조
+  - 나머지 69개+ 파일(fart86 키)은 이 파일럿에서 검증된 패턴(role 권한 확인→부여, credentials 제거, **webpack 시크릿 유출 gotcha 먼저 확인**, 배포 전 로컬 빌드 검증, 다른 변경사항과 분리해서 배포)을 그대로 적용
+  - `AKIAUOUWAIC46JCDIJF6` deactivate는 모든 소비자 전환 확인 후(아직 1/70+)
+- **추가 (같은 날, 별건):** `admin-dev-restapi`에 신규 기능(`/eventbridge/list`, dispatch-one-time 규칙 조회 API) 추가하면서 같은 패턴(role 권한 확인→최소권한 정책 신설→assume-role 검증→dev 먼저 배포→production 배포) 한 번 더 실증. `admin-dev-restapi-eventbridge-read` 정책 신설, 양쪽 role에 부착. role/정책 전체 인벤토리는 [[aws-inventory/admin-dev-restapi-iam]], 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].
+- **추가 발견 (2026-08-18):** `~/psapp/cron/driver-runnstatus-cron/src/utils/aws/eventBridge.ts`(및 `~/psapp/serv/cron_serv/packages/runnstatus/src/utils/aws/eventBridge.ts` 동일 파일 추정, 미확인)에 **kimps 키(`AKIAUOUWAIC4676HY4KB`, 2024-12-28 발급)**가 2군데(client 초기화 + cleanup 함수) 하드코딩. fart86 키(70개+ 파일)와 별개의 노출 건 — dispatch-one-time 규칙 정리 실패 원인 조사([[aws-ops/2026-08-18-dispatch-one-time-rule-cleanup-failure-investigation]]) 중 우연히 발견. **일단 기록만, 조치는 안 함.**
+
+---
+
+## webpack DefinePlugin이 process.env 경유로 로컬 셸 시크릿 전체를 배포 번들에 유출 (15개+ 리포 영향 가능성)
+
+**상태:** 🔴 미해결 (2026-08-17 발견, `admin-dev-restapi`만 부분 완화 — AWS_ prefix만 제외, 근본 원인은 그대로)
+
+**대상:** `~psapp`(ps_aws 리포 밖) 의 `admin-*-restapi`/`user-*-restapi` 계열이 공유하는 `webpack.config.cjs` 보일러플레이트. `admin-dev-restapi`, `admin-etc-restapi` 확인됨 — CLAUDE.md에 "동일 보일러플레이트에서 분기"라 적혀있어 **15개+ 리포 전부 같은 구조일 가능성 높음(미검증)**.
+
+**왜:** `getEnvVar()`가 `Object.keys(process.env)`(빌드 실행자의 로컬 셸 환경변수 전체)를 `webpack.DefinePlugin({"process.env": {...}})`으로 번들에 통째로 굽는 구조. 실제 배포된 `admin-dev-restapi` 번들을 열어보니 `GITHUB_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `LINEAR_API_KEY`, `SERVER_KEY_NOTION`, `SERVER_KEY_GEMINI_API_KEY`, `SERVER_KEY_SLACKWEBHOOK_*`, `MYSQL_PASSWORD`, `MONGO_PASSWORD` 등 개발자 로컬 환경의 실제 시크릿 수백 개가 평문으로 배포 번들에 포함돼있었음. 상세 발견 경위 [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]], gotcha [[gotchas#awssrc-webpack-defineplugin이-processenv를-통째로-얼려서-lambda-기본-자격증명-체인을-깨뜨림]].
+
+**잠재 효과:** 이 Lambda 코드(`GetFunction`)나 S3 배포 아티팩트(`ms-sam` 버킷)에 접근 권한이 있는 사람/역할이면 누구나 GitHub 토큰, Linear API 키, 각종 서드파티 서비스 키, DB 비밀번호를 평문으로 열람 가능. 배포할 때마다(빌드 실행자가 바뀔 때마다) 내용이 갱신되며 계속 유출됨 — 일회성 사고가 아니라 **구조적으로 매 배포마다 반복**.
 
 **다음 행동:**
-- 각 Lambda(driver-runn-cron 등)를 실행 역할(IAM Role) 기반으로 전환 — 코드에서 `accessKeyId`/`secretAccessKey` 하드코딩 제거
-- 전환 전까지는 최소한 해당 키 로테이션 주기 확인
-- `fart86`이 실제 활성 서비스 계정인지, 아니면 이 계정도 정리 대상인지 확인 필요(khj.dev처럼 콘솔 로그인은 오래전(2018)이라 사람 사용은 아닌 것으로 보이나 액세스키는 활발히 쓰임 — 서비스 계정으로 판단됨)
+1. `admin-etc-restapi` 포함 나머지 admin-*/user-*-restapi 리포 전체가 동일 `getEnvVar()` 패턴인지 확인 (`grep -n "Object.keys(process.env)" webpack.config.cjs`)
+2. 확인되면 전체 리포에 근본 fix 적용 — `admin-dev-restapi`에서 검증된 패턴: `process.env`는 안 건드리고 `__BAKED_ENV__` 별도 전역 + 런타임 `Object.assign` 병합 (AWS_ prefix 제외 필수)
+3. 이미 배포된 과거 아티팩트(`ms-sam` S3 버킷의 각 리포별 과거 타임스탬프 버전들)에도 이 유출이 누적돼있음 — 라이프사이클/접근 IAM 최소화 필요(운영 DB 평문 자격증명 건과 동일한 성격, [[#운영-db-평문-자격증명-processenv-로깅-사설화와-무관-즉시-조치]] 참조)
+4. 유출된 것으로 확인된 개별 시크릿(GITHUB_TOKEN, LINEAR_API_KEY, SERVER_KEY_NOTION, SERVER_KEY_GEMINI_API_KEY 등)은 로테이션 검토 대상 — 실제 악용 여부와 무관하게 노출 자체가 사고
 
 ---
 

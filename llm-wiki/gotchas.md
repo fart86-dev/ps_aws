@@ -4,7 +4,7 @@ repo: ps-aws
 domains: []
 stack: [aws-sdk-v3, aws-cli, cloudwatch, node-cron]
 status: active
-updated: 2026-08-16
+updated: 2026-08-17
 ---
 
 # gotchas — 건드리면 터지는 곳
@@ -385,3 +385,80 @@ IAM 사용자 삭제 순서를 그룹 탈퇴 → 액세스키 삭제 → SSH키 
 - 도구가 제공하는 `rules/aws-agent-rules.md` 를 그대로 프로젝트 `CLAUDE.md`에 덮어쓰면 이 리포의 protected-resources/절대규칙이 날아감 — 반영할 땐 별도 파일([[../aws-agent-toolkit-rules]])로 분리할 것.
 
 상세 [[aws-ops/2026-07-20-agent-toolkit-setup]].
+
+---
+
+## [AWS+src] `src/` 로컬 실행 시 SDK 기본 자격증명 체인이 실제로 kimps 개인 장기 액세스 키를 씀  #gotcha
+
+`conventions.md` 규칙대로 `src/` 의 모든 AWS SDK 클라이언트(`EventBridgeClient`, `CloudWatchClient`, `RDSClient` 등)는 `credentials` 를 코드에서 넘기지 않고 SDK 기본 provider chain에 맡긴다. 그 자체는 관례대로지만, **이 macOS 계정에서 그 체인이 실제로 뭘 집는지**는 코드만 봐서는 안 보인다.
+
+`aws configure list` 로 확인(2026-08-17): `~/.aws/config` 의 `default` 프로파일엔 리전만 있고, access key/secret key는 `~/.aws/credentials`(shared-credentials-file)에서 로드됨. 키 끝자리 `Y4KB` = `AKIAUOUWAIC4676HY4KB` — [[aws-pending#cron_servdriver-runn-cron-하드코딩-aws-액세스-키--규모-재확인-70개-파일-psapp-백엔드-전체]] 에서 이미 특정된 **kimps 소유 개인 장기 액세스 키**와 동일.
+
+**함의:** 로컬에서 `pnpm dev`/`tsx src/scripts/*.ts` 로 이 리포 코드를 돌리면 (env로 다른 `AWS_PROFILE` 지정하지 않는 한) kimps님 개인 키를 그대로 쓰게 됨. 새 스크립트/모니터를 추가해 로컬에서 테스트할 때 "어느 자격증명으로 호출되는지" 의심스러우면 코드가 아니라 `aws configure list` 로 확인할 것. 운영(배포) 환경의 인증 방식(IAM Role 여부 등)은 별개이며 이 위키에 기록된 바 없음 — 확인 안 된 채로 남겨둠.
+
+---
+
+## [AWS+src] webpack `DefinePlugin`이 `process.env`를 통째로 얼려서 Lambda 기본 자격증명 체인을 깨뜨림  #gotcha
+
+`~psapp`(ps_aws 리포 밖) 의 `admin-*-restapi`/`user-*-restapi` 계열이 공유하는 `webpack.config.cjs` 보일러플레이트가 이런 패턴을 씀:
+
+```js
+const raw = Object.keys(process.env).reduce((env, key) => { env[key] = process.env[key]; return env; }, {});
+new webpack.DefinePlugin({ "process.env": { ...raw, ...envVars, NODE_ENV } });
+```
+
+`Object.keys(process.env)` = **`.env.{stage}` 파일이 아니라 빌드를 실행한 사람의 로컬 셸 환경변수 전체.** 이게 `"process.env": {...}` 형태(dotted key 아니라 통째 객체)로 DefinePlugin에 들어가면, **`process.env` 참조 자체가 이 얼어붙은 객체로 치환됨** — dot 접근(`process.env.KEY`)뿐 아니라 bracket 접근(`process.env[dynamicKey]`, AWS SDK 내부 패턴)과 `process.env`를 통째로 다른 함수에 넘기는 경우까지 전부.
+
+**결과 두 가지:**
+1. **AWS SDK 기본 자격증명 체인이 깨짐.** 빌드 머신 셸엔 `AWS_ACCESS_KEY_ID` 같은 게 보통 없어서(이 계정은 `~/.aws/credentials` 파일 방식) 얼어붙은 객체에 그 키가 없음 → Lambda가 실제로 주입하는 값 대신 `undefined` → `CredentialsProviderError: Could not load credentials from any providers`. 하드코딩 자격증명을 제거하고 IAM Role 기반으로 전환하려는 시도가 전부 이걸로 실패함.
+2. **로컬 셸의 실제 시크릿이 배포 번들에 통째로 새겨짐.** `GITHUB_TOKEN`, `LINEAR_API_KEY`, `SERVER_KEY_NOTION`, `SERVER_KEY_GEMINI_API_KEY`, `MYSQL_PASSWORD` 등 개발자 로컬 환경의 진짜 시크릿 수백 개가 평문으로 배포됨. `admin-etc-restapi`도 동일 패턴 확인 — **15개+ 리포 공통 보일러플레이트라 전부 영향 가능성.**
+
+**fix (검증됨, `admin-dev-restapi` 적용):** `process.env`는 아예 안 건드리고, 빌드타임 값은 별도 전역(`__BAKED_ENV__`)으로만 주입한 뒤 **런타임에** 병합:
+
+```js
+// webpack.config.cjs — AWS_ prefix도 제외해서 이중 안전
+return { __BAKED_ENV__: JSON.stringify({ ...raw(AWS_ 제외), ...envVars, NODE_ENV }) };
+```
+```ts
+// handler.ts 최상단, bootstrap() 호출보다 먼저
+declare const __BAKED_ENV__: Record<string, string>;
+Object.assign(process.env, __BAKED_ENV__);
+```
+
+`Object.assign`은 기존 키를 안 지우므로 Lambda가 실제 주입한 값은 유지되고, `.env.{stage}` 값은 덧붙여져서 `env.MYSQL_HOST` 같은 기존 코드도 그대로 동작.
+
+**배포 전 검증 방법 (중요):** 이 종류의 fix는 이론만으로 확신하지 말 것 — 로컬에서 실제로 빌드하고 산출물(`.aws-sam/build/handler.js`)을 직접 열어 확인, 가능하면 `sts assume-role`로 받은 실제 Lambda role의 임시 자격증명만 있는 깨끗한 환경에서 실제 AWS 호출까지 재현해서 검증한 뒤 배포를 제안할 것. 2026-08-17에 이 검증 없이 두 번 연속 프로덕션 배포를 실패시킨 사고 있음.
+
+**미해결:** 시크릿 유출 자체(2번)는 `admin-dev-restapi`에서도 아직 안 고쳐짐(AWS_ prefix만 제외했을 뿐). 15개+ 리포 전체 확인 및 근본 fix(로컬 셸 전체가 아니라 명시적 값만 사용하는 구조로 변경)는 별도 트랙.
+
+상세 [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]].
+
+---
+
+## [src] `admin_doc`(OpenAPI 스펙 저작 리포) 작업 시 함정 모음  #gotcha
+
+`~/docs/admin_doc`(ps_aws 밖)에서 관리자 API 엔드포인트를 새로 추가할 때 겪은 것들. 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].
+
+- **태그명에 하이픈이 있으면 BE 코드 생성이 문법 에러로 실패한다.** 생성기(`ms_dev_doc`)가 태그명을 그대로 JS 식별자(`import`/`class`)로 쓴다 — `dispatch-rules` → `import dispatch-rules from ...`. 기존 관례(`dispatchcase`처럼 구분자 없는 한 단어)를 따를 것.
+- **스펙 원본이 여러 곳에 중복돼 있을 수 있다.** admin-dev-restapi의 스펙은 `admin_doc`의 `etc` 패키지가 아니라 `dev` 패키지(그 부분 복제본)에서 온다 — 새 엔드포인트를 실제로 쓰려면 원본 패키지뿐 아니라 소비 리포가 참조하는 패키지도 같이 고쳐야 한다.
+- **로컬 검증 중엔 `npx admindoc`(package.json 스크립트)을 쓰지 말 것.** 이건 `admin_doc`을 git+ssh 특정 태그로 고정 참조해서, 로컬 `admin_doc` 변경사항이 아직 커밋·태그 갱신 전이면 오히려 **로컬 변경을 원격 버전으로 되돌려버린다**(라우터 재생성 시 신규 등록분 삭제). 로컬 검증 땐 `node <admin_doc 경로>/dist/bin/cli.js -t be -p <prjNm>`을 직접 실행. 원격 태그가 실제로 갱신된 뒤에는 `npx admindoc`이 다시 안전.
+- **operationId 전역 유일성은 Spectral 린트가 안 잡는다.** `node makeopid.js`로 별도 확인 필요.
+
+---
+
+## [src] macOS 대소문자 무시 파일시스템 vs TypeScript의 대소문자 검사  #gotcha
+
+macOS(APFS 기본)는 파일명 대소문자를 구분하지 않는다 — `dispatchRules.ts`와 `dispatchrules.ts`는 같은 파일로 취급되어, 코드 생성기가 소문자로 파일을 써도 조용히 기존 파일에 덮어써진다. 하지만 **`tsc`는 import 경로의 대소문자 일치를 엄격히 검사**해서 `TS1261`(casing mismatch) 에러를 낸다.
+
+`mv old.ts new.ts` 한 번으로는 대소문자만 바뀌는 rename이 실제로 적용 안 될 수 있다(같은 파일로 인식) — `mv old.ts tmp.ts && mv tmp.ts new.ts` 2단계 rename으로 강제해야 실제 디렉토리 엔트리의 대소문자가 바뀐다.
+
+2026-08-17 `admin-dev-restapi`에서 admin_doc 코드 생성기가 `dispatchrules.ts`(소문자)를 쓰는데 먼저 `dispatchRules.ts`(카멜)로 만들어놔서 발생. 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].
+
+---
+
+## [src] admin-dev-restapi는 dev/production 배포 메커니즘이 서로 다름 (CDK vs SAM)  #gotcha
+
+- `pnpm deploy:dev` = `CDK_STAGE=dev npx cdk deploy` — AWS CDK(`cdk/bin/app.ts`, `ms_cdk`의 `MsRestApi` construct). `--require-approval never`로 인터랙티브 확인 없음.
+- `pnpm deploy:prod` = `npx vite-node scripts/deploy.ts --stage production` → 내부적으로 SAM(`sam deploy --config-env production`). changeset 프리뷰 후 **`[y/N]` 인터랙티브 확인이 있음** — 자동화하려면 `echo y | ...`로 넘겨야 함.
+
+둘 다 최종적으로 같은 `.aws-sam/build`(webpack 산출물)를 코드 자산으로 쓰지만 오케스트레이션 도구 자체가 다르다. dev에서 통과했다고 prod 배포 스크립트가 같은 방식으로 동작할 거라 가정하지 말 것. 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].

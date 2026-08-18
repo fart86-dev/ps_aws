@@ -31,6 +31,7 @@ updated: 2026-06-26
 | 타입 검사만 | `pnpm type-check` |
 | WAF Bot Control | `pnpm waf:bot <status\|disable\|enable> [--target dev\|prod\|all] [--confirm]` |
 | RDS 상태 | `pnpm rds:status [--target <id>] [--findings] [--json] [--cost] [--days N]` |
+| dispatch-one-time 규칙 점검 | `pnpm dispatch:rules` (플래그 없음) |
 
 > 백그라운드 스크립트(`scripts/dev-bg.sh`)는 `npx tsx ...` 를 직접 부른다 — `tsx watch` 가 아니라 `tsx` 단발 실행이므로 코드 수정 시 자동 재시작되지 않는다. 의도된 차이인지 확인 필요. #todo
 
@@ -84,6 +85,7 @@ updated: 2026-06-26
 | `infra-monitor/rds.ts`, `dynamodb.ts`, `waf.ts` | AWS SDK 디폴트 (보통 `AWS_REGION` env 또는 `~/.aws/config`) |
 | `infra-monitor/waste.ts` | `process.env.AWS_REGION ?? "ap-northeast-2"` |
 | `scripts/rdsStatus.ts` | `ap-northeast-2` hard-coded |
+| `infra-monitor/dispatchRules.ts` (= `scripts/dispatchRulesStatus.ts`) | `process.env.AWS_REGION ?? "ap-northeast-2"` |
 | `scripts/wafBotControl.ts` | `us-east-1` hard-coded (CloudFront scope 전용) |
 | `scripts/rdsStatus.ts` Cost Explorer | `us-east-1` 강제 (CE는 us-east-1 only) |
 
