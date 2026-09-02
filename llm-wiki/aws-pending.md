@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-08-18
+last_updated: 2026-09-02
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -542,6 +542,20 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 **다음 행동:**
 - 콘솔에서 Health Dashboard "Affected Resources" 확인 → 실제로 저장해둔 게 있는 사용자 있으면 2026-08-25 전에 해당 계정으로 CloudShell 한 번 실행(삭제 취소됨)
 - 아무도 안 쓰는 것 같으면 별도 조치 없이 흘려보내도 무방
+
+---
+
+## production-admin-test CloudFront 후속 (DNS + 콘텐츠 업로드)
+
+**상태:** 🟢 사용자 진행 대기
+
+**대상:** 신규 Distribution `E3W54LLJ0M7SFV` (`production-admin-test`, `d2qzb9axi7zh9z.cloudfront.net`).
+
+**왜:** 2026-09-02 `production-admin-drvcontr`(`E3H054W7ITS1QP`) 설정 복제로 생성. Origin `admin.modoo/test`, Alias `admin-test.modooshuttle.com`. 상세 [[aws-ops/2026-09-02-cloudfront-admin-test-distribution]].
+
+**다음 행동:**
+- [ ] DNS: `admin-test.modooshuttle.com` → `d2qzb9axi7zh9z.cloudfront.net` CNAME 등록 (사용자 직접)
+- [ ] S3 `admin.modoo/test/` prefix 비어있음 — 빌드 산출물 업로드 필요
 
 ---
 
