@@ -4,7 +4,7 @@ repo: ps-aws
 domains: []
 stack: [aws-sdk-v3, aws-cli, cloudwatch, node-cron]
 status: active
-updated: 2026-08-17
+updated: 2026-09-08
 ---
 
 # gotchas — 건드리면 터지는 곳
@@ -320,6 +320,26 @@ AppSync/익스포트 Lambda 말고 **`iac_shuttle_analytics`(Managed Flink, PyFl
 `cdk diff`(change set 기반, "accurate replacement information")를 배포 전에 항상 먼저 떠서 실제로 뭐가 바뀌는지 확인하는 습관이 `detect-stack-drift`보다 더 직접적인 답을 준다 — drift는 "차이가 있다"만 알려주고, diff가 "이번에 실제로 뭘 바꿀지"를 알려준다.
 
 dev 스택(`driver-tracking-api-dev`)은 Auto Scaling 미적용이라 이 드리프트 패턴 자체가 없다 — production만의 특성.
+
+---
+
+## [AWS] 실시간/고빈도 컴포넌트는 배포 시점부터 로깅 설정을 점검해야 함 — 사후 발견 패턴 반복  #gotcha
+
+`driver-tracking-api-production`(AppSync) 하나가 매일 350~600MB(30일 합계 ~10.8GB)를 CloudWatch Logs로 쏟아내 계정 전체 CloudWatch 무료 한도(로그 수집 5GB/월)를 매달 160~240% 초과시키고 있었다. 이 설정은 스택이 처음 배포된 2025-12-26부터(적어도 확인 가능한 90일 전부터) 계속 이 상태였고, **최근 배포(2026-07-18) 때문이 아니라 애초에 설계 때부터 방치된 문제**였다 — 즉 비용이 눈에 띌 때까지 아무도 몰랐다.
+
+**교훈:** WebSocket 구독, 실시간 위치 트래킹, Kinesis/DynamoDB Streams 소비자처럼 **요청 빈도 자체가 트래픽에 비례해 매우 높은 컴포넌트**는, 사후에 Cost Explorer로 발견하는 게 아니라 **배포/설계 시점에 로깅 설정(AppSync `fieldLogLevel`+`excludeVerboseContent`, Lambda 로그 레벨, 커스텀 메트릭 발행 빈도, 로그 그룹 retention)을 반드시 같이 점검**해야 한다.
+
+조치 및 조사 경위 [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging]]. **아래 gotcha와 함께 볼 것 — 첫 조치(`excludeVerboseContent:true`)는 검증 없이 적용했다가 효과가 없었음이 나중에 밝혀짐.**
+
+---
+
+## [AWS] AppSync `excludeVerboseContent`는 `fieldLogLevel: NONE`일 때 효과가 없음 — 진짜 원인은 요청량  #gotcha
+
+`fieldLogLevel: NONE`이면 verbose 내용(헤더/컨텍스트/매핑 템플릿)이 실리는 `Tracing`/`RequestMapping`/`ResponseMapping` 로그 자체가 애초에 생성되지 않는다 — `excludeVerboseContent`는 그 로그 타입들에만 영향을 주는 옵션이라 `NONE` 상태에서는 아무것도 줄이지 못한다. 매 요청마다 무조건 찍히는 `RequestSummary`(요청ID/지연시간/상태, 건당 ~330바이트)만 남고, 이건 옵션과 무관하게 요청 수에 비례해 계속 쌓인다.
+
+`driver-tracking-api-production`에 `excludeVerboseContent:false→true`를 적용하고 "해결됐다"고 보고했으나, **적용 전/후 실측(전날 같은 시간대 vs 적용 후 같은 시간대, `IncomingBytes`÷`IncomingLogEvents`로 이벤트당 평균 바이트 비교)을 했더니 335 bytes → 333 bytes로 사실상 무변화**였다. 사용자가 "로그를 아예 없앨 수 있나" 재질문한 뒤에야 뒤늦게 검증해서 오판을 발견함.
+
+**교훈:** "이 설정이 원인일 것이다"라는 추론만으로 조치를 완료 처리하지 말 것. 설정을 바꾼 뒤엔 반드시 **적용 전/후 실측 비교**로 실제 효과를 확인한다 — AppSync 로그처럼 여러 로그 타입이 섞여 있는 경우 특히, 어느 설정이 어느 로그 타입에만 영향을 주는지 정확히 이해하지 않으면 "그럴듯한 원인"에 낚이기 쉽다. 실제 해법은 로깅 레벨 조정이 아니라 **CloudWatch Logs 로깅 자체를 완전히 끄는 것**(`UpdateGraphqlApi` 호출 시 `logConfig` 파라미터를 아예 생략하면 로깅이 disable됨 — `GetGraphqlApi` 응답에서 `logConfig` 키 자체가 사라지는 것으로 확인 가능)이었다. 상세 [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging#5-오판-정정--excludeverbosecontent는-효과-없었음-진짜-원인은-요청량-자체]].
 
 ---
 

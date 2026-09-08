@@ -545,6 +545,37 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 
 ---
 
+## 실시간/고빈도 컴포넌트 로깅 설정 상시 점검
+
+**상태:** ✅ 이 계정의 AppSync/Firehose 전수 점검·조치 완료 (2026-09-08). 원칙은 신규 컴포넌트에 계속 적용.
+
+**대상:** WebSocket 구독·실시간 위치 트래킹·Streams 소비자처럼 트래픽에 비례해 요청 빈도가 매우 높은 컴포넌트 전반.
+
+**왜:** 이런 컴포넌트는 사후에 비용/Free Tier 초과로 발견되기 전까지 아무도 모른 채 방치되기 쉬움. 사후 대응이 아니라 **신규 배포·설계 시점부터 로깅 설정을 기본 점검 항목에 넣어야** 재발을 막을 수 있음 (사용자 지시, 2026-09-08).
+
+**진행 경과:**
+1. `driver-tracking-api-production`에서 최초 발견 — 월 8~12GB로 CloudWatch 무료 한도(5GB) 초과.
+2. AppSync API 6개 전수 점검 → `driver-tracking-{api,alert-api}-{production,dev}` 4개가 동일 결함(`excludeVerboseContent:false`) 확인, 나머지 2개(`appsync-driver-api-production`, `drv_runn`)는 이미 정상.
+3. Kinesis Firehose 활성 스트림 10개 점검 → 배달 실패시에만 로깅하는 구조라 애초에 위험 없음, 조치 불필요 확인.
+4. **1차 조치(`excludeVerboseContent:true`)를 실측 검증 없이 완료 처리했다가 오판으로 판명** — 적용 전/후 이벤트당 평균 바이트가 335→333bytes로 무변화. `fieldLogLevel:NONE`에서는 이 옵션 자체가 영향을 주는 로그 타입이 생성되지 않기 때문. gotcha 등록: [[gotchas#aws-appsync-excludeverbosecontent는-fieldloglevel-none일-때-효과가-없음--진짜-원인은-요청량]].
+5. **최종 조치**: 4개 API 전부 CloudWatch Logs 로깅 완전 비활성화(`UpdateGraphqlApi` 호출 시 `logConfig` 생략 → 로깅 disable). `AWS/AppSync` 기본 메트릭(Latency/에러율)은 유지, `RequestSummary` 요청 단위 로그만 소실.
+
+상세 [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging]].
+
+**점검 체크리스트 (신규 실시간 컴포넌트 배포 시 계속 적용):**
+- AppSync: 로깅이 정말 필요한지 먼저 판단 — 필요 없으면 `logConfig` 자체를 안 넣는 게 가장 확실. 필요하면 `fieldLogLevel`+`excludeVerboseContent` 설정, **적용 후 반드시 전/후 실측(이벤트당 평균 바이트)으로 효과 검증**
+- Lambda: 로그 레벨(디버그 로그 상시 on 여부), 고빈도 크론/이벤트 소스일수록 영향 큼
+- Kinesis/DynamoDB Streams 소비자: CloudWatch 커스텀 메트릭 발행 빈도
+- 모든 로그 그룹: retention 설정 여부 ([[#cloudwatch-logs-retention-정책]]과 연계)
+
+**다음 행동:**
+- [ ] 익일 이후 4개 API 로그 그룹에 신규 로그 실제로 안 들어오는지 확인
+- [ ] 다음 달 Cost Explorer `APN2-DataProcessing-Bytes`가 5GB 이내로 들어오는지 확인
+- [ ] 로깅 완전 차단 후 장애 디버깅에 실제 지장 있으면 `fieldLogLevel:ERROR` 정도로 최소 재활성화 검토
+- [ ] 신규 실시간 컴포넌트 설계/배포 시 위 체크리스트를 배포 전 확인 항목으로 포함
+
+---
+
 ## production-admin-test CloudFront 후속 (DNS + 콘텐츠 업로드)
 
 **상태:** 🟢 사용자 진행 대기

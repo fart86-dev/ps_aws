@@ -53,6 +53,8 @@ updated: 2026-09-02
 - [[aws-ops/2026-08-18-dispatch-one-time-rule-cleanup-failure-investigation]] — 2026-04-22 규칙이 안 지워진 이유 조사, 자기정리 로직 결함 발견 + kimps 키 하드코딩 부수 발견
 - [[aws-ops/2026-08-18-admin-dev-restapi-eventbridge-delete]] — admin-dev-restapi에 EventBridge 규칙 삭제 API(`DELETE /eventbridge`) 신설, dev+production 배포 완료 (등록/생성 기능은 보류)
 - [[aws-ops/2026-09-02-cloudfront-admin-test-distribution]] — production-admin-drvcontr 설정 복제로 신규 CloudFront distribution(`production-admin-test`) 생성, DNS/콘텐츠 업로드는 후속
+- [[aws-ops/2026-09-07-ms-file-search-console-noindex]] — ms-file.modooshuttle.com GSC "내용 없이 색인 생성" 조사, 원인은 2023년부터 있던 S3 빈 디렉터리 마커(최근 변경 아님), prod CloudFront에 X-Robots-Tag noindex 헤더 적용 완료
+- [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging]] — CloudWatch Free Tier 초과 원인이 driver-tracking 계열 AppSync 4개의 고빈도 요청 로그임을 특정. 1차 조치(excludeVerboseContent:true)는 검증 결과 효과 없었음이 드러나 정정, 최종적으로 4개 API 로깅 완전 비활성화로 해결
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/rds-mysql-minor-version-upgrade]] — RDS MySQL 마이너 버전 인플레이스 업그레이드
