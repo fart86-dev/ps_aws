@@ -15,13 +15,15 @@
     "type-check": "tsc --noEmit",
     "logs": "tail -f app.log",
     "waf:bot": "tsx src/scripts/wafBotControl.ts",
-    "rds:status": "tsx src/scripts/rdsStatus.ts"
+    "rds:status": "tsx src/scripts/rdsStatus.ts",
+    "dispatch:rules": "tsx src/scripts/dispatchRulesStatus.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.614.0",
     "@aws-sdk/client-cost-explorer": "^3.1057.0",
     "@aws-sdk/client-dynamodb": "^3.614.0",
     "@aws-sdk/client-ec2": "^3.1057.0",
+    "@aws-sdk/client-eventbridge": "^3.614.0",
     "@aws-sdk/client-rds": "^3.614.0",
     "@aws-sdk/client-wafv2": "^3.614.0",
     "dotenv": "^16.4.5",

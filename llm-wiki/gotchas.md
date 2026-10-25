@@ -4,7 +4,7 @@ repo: ps-aws
 domains: []
 stack: [aws-sdk-v3, aws-cli, cloudwatch, node-cron]
 status: active
-updated: 2026-07-30
+updated: 2026-09-08
 ---
 
 # gotchas — 건드리면 터지는 곳
@@ -323,6 +323,26 @@ dev 스택(`driver-tracking-api-dev`)은 Auto Scaling 미적용이라 이 드리
 
 ---
 
+## [AWS] 실시간/고빈도 컴포넌트는 배포 시점부터 로깅 설정을 점검해야 함 — 사후 발견 패턴 반복  #gotcha
+
+`driver-tracking-api-production`(AppSync) 하나가 매일 350~600MB(30일 합계 ~10.8GB)를 CloudWatch Logs로 쏟아내 계정 전체 CloudWatch 무료 한도(로그 수집 5GB/월)를 매달 160~240% 초과시키고 있었다. 이 설정은 스택이 처음 배포된 2025-12-26부터(적어도 확인 가능한 90일 전부터) 계속 이 상태였고, **최근 배포(2026-07-18) 때문이 아니라 애초에 설계 때부터 방치된 문제**였다 — 즉 비용이 눈에 띌 때까지 아무도 몰랐다.
+
+**교훈:** WebSocket 구독, 실시간 위치 트래킹, Kinesis/DynamoDB Streams 소비자처럼 **요청 빈도 자체가 트래픽에 비례해 매우 높은 컴포넌트**는, 사후에 Cost Explorer로 발견하는 게 아니라 **배포/설계 시점에 로깅 설정(AppSync `fieldLogLevel`+`excludeVerboseContent`, Lambda 로그 레벨, 커스텀 메트릭 발행 빈도, 로그 그룹 retention)을 반드시 같이 점검**해야 한다.
+
+조치 및 조사 경위 [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging]]. **아래 gotcha와 함께 볼 것 — 첫 조치(`excludeVerboseContent:true`)는 검증 없이 적용했다가 효과가 없었음이 나중에 밝혀짐.**
+
+---
+
+## [AWS] AppSync `excludeVerboseContent`는 `fieldLogLevel: NONE`일 때 효과가 없음 — 진짜 원인은 요청량  #gotcha
+
+`fieldLogLevel: NONE`이면 verbose 내용(헤더/컨텍스트/매핑 템플릿)이 실리는 `Tracing`/`RequestMapping`/`ResponseMapping` 로그 자체가 애초에 생성되지 않는다 — `excludeVerboseContent`는 그 로그 타입들에만 영향을 주는 옵션이라 `NONE` 상태에서는 아무것도 줄이지 못한다. 매 요청마다 무조건 찍히는 `RequestSummary`(요청ID/지연시간/상태, 건당 ~330바이트)만 남고, 이건 옵션과 무관하게 요청 수에 비례해 계속 쌓인다.
+
+`driver-tracking-api-production`에 `excludeVerboseContent:false→true`를 적용하고 "해결됐다"고 보고했으나, **적용 전/후 실측(전날 같은 시간대 vs 적용 후 같은 시간대, `IncomingBytes`÷`IncomingLogEvents`로 이벤트당 평균 바이트 비교)을 했더니 335 bytes → 333 bytes로 사실상 무변화**였다. 사용자가 "로그를 아예 없앨 수 있나" 재질문한 뒤에야 뒤늦게 검증해서 오판을 발견함.
+
+**교훈:** "이 설정이 원인일 것이다"라는 추론만으로 조치를 완료 처리하지 말 것. 설정을 바꾼 뒤엔 반드시 **적용 전/후 실측 비교**로 실제 효과를 확인한다 — AppSync 로그처럼 여러 로그 타입이 섞여 있는 경우 특히, 어느 설정이 어느 로그 타입에만 영향을 주는지 정확히 이해하지 않으면 "그럴듯한 원인"에 낚이기 쉽다. 실제 해법은 로깅 레벨 조정이 아니라 **CloudWatch Logs 로깅 자체를 완전히 끄는 것**(`UpdateGraphqlApi` 호출 시 `logConfig` 파라미터를 아예 생략하면 로깅이 disable됨 — `GetGraphqlApi` 응답에서 `logConfig` 키 자체가 사라지는 것으로 확인 가능)이었다. 상세 [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging#5-오판-정정--excludeverbosecontent는-효과-없었음-진짜-원인은-요청량-자체]].
+
+---
+
 ## [AWS] CloudTrail `lookup-events`는 90일 제한 + IAM은 `us-east-1` 명시 필요  #gotcha
 
 `aws cloudtrail lookup-events`(Event history API)는 **최근 90일만 조회 가능** — 트레일의 S3 보존기간이 길어도 무관한 AWS 하드 리밋.
@@ -353,6 +373,26 @@ IAM 사용자 삭제 순서를 그룹 탈퇴 → 액세스키 삭제 → SSH키 
 
 ---
 
+## [AWS] RDS 스냅샷/인스턴스 identifier는 마침표 금지  #gotcha
+
+`aws rds create-db-snapshot --db-snapshot-identifier`(인스턴스 identifier도 동일)는 letters/digits/hyphens만 허용 — `.`(마침표)가 들어가면 `InvalidParameterValue`로 즉시 거부된다.
+
+버전 문자열(예: `8.4.9`)을 identifier에 그대로 넣고 싶어질 때 특히 걸리기 쉽다 — `production-mshuttle-pre-8.4.9-upgrade`는 실패, `production-mshuttle-pre-8-4-9-upgrade`로 점을 하이픈으로 바꿔야 함.
+
+2026-08-16 RDS MySQL 마이너 버전 업그레이드 작업 중 실제로 이 에러를 맞고 정정함. 상세 [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade#2-step-1-production-mshuttle-수동-스냅샷-완료]], 절차 [[aws-runbooks/rds-mysql-minor-version-upgrade]].
+
+---
+
+## [AWS] RDS 마이너 버전 업그레이드: 실다운타임 vs `DBInstanceStatus available` 반영 시점 사이 큰 격차  #gotcha
+
+`modify-db-instance --engine-version --apply-immediately`로 마이너 버전을 올리면, `describe-events`로 보이는 실제 다운타임(`DB instance shutdown` ~ `DB instance restarted`)은 수 분(2~3분) 수준으로 짧다. 그런데 `DBInstanceStatus`가 `upgrading` → `configuring-enhanced-monitoring` → (Enhanced Monitoring/Performance Insights 사용 인스턴스는) `modifying` → `available`로 완전히 전환되기까지는 총 30~40분까지 걸릴 수 있다 — 엔진 업그레이드 자체(`engine version upgrade finished` 이벤트)는 훨씬 먼저 끝나 있는데도 그렇다.
+
+**함의:** "언제 다운타임이 끝나는가"(애플리케이션 영향 관점)와 "언제 API가 `available`을 보고하는가"(자동화 스크립트가 기다리는 조건)가 다르다. 자동화에서 `wait db-instance-available`로 다음 단계(예: source 업그레이드)를 게이팅하면 실제로 필요한 것보다 훨씬 오래 기다리게 될 수 있음 — 실다운타임 종료 확인이 목적이면 `describe-events`의 `DB instance restarted` 이벤트를 보는 게 더 빠른 신호.
+
+2026-08-16 production-mshuttle/read1 업그레이드에서 실측(둘 다 실다운타임 2~3분, `available` 반영까지는 30~40분). 상세 [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade#8-관찰-사항]].
+
+---
+
 ## [AWS] `aws configure agent-toolkit`는 프로젝트가 아니라 macOS 사용자 계정 전역을 건드림  #gotcha
 
 `aws/agent-toolkit-for-aws` (공식 AWS 저장소) 의 `aws configure agent-toolkit --yes --region us-east-1` 는:
@@ -365,3 +405,80 @@ IAM 사용자 삭제 순서를 그룹 탈퇴 → 액세스키 삭제 → SSH키 
 - 도구가 제공하는 `rules/aws-agent-rules.md` 를 그대로 프로젝트 `CLAUDE.md`에 덮어쓰면 이 리포의 protected-resources/절대규칙이 날아감 — 반영할 땐 별도 파일([[../aws-agent-toolkit-rules]])로 분리할 것.
 
 상세 [[aws-ops/2026-07-20-agent-toolkit-setup]].
+
+---
+
+## [AWS+src] `src/` 로컬 실행 시 SDK 기본 자격증명 체인이 실제로 kimps 개인 장기 액세스 키를 씀  #gotcha
+
+`conventions.md` 규칙대로 `src/` 의 모든 AWS SDK 클라이언트(`EventBridgeClient`, `CloudWatchClient`, `RDSClient` 등)는 `credentials` 를 코드에서 넘기지 않고 SDK 기본 provider chain에 맡긴다. 그 자체는 관례대로지만, **이 macOS 계정에서 그 체인이 실제로 뭘 집는지**는 코드만 봐서는 안 보인다.
+
+`aws configure list` 로 확인(2026-08-17): `~/.aws/config` 의 `default` 프로파일엔 리전만 있고, access key/secret key는 `~/.aws/credentials`(shared-credentials-file)에서 로드됨. 키 끝자리 `Y4KB` = `AKIAUOUWAIC4676HY4KB` — [[aws-pending#cron_servdriver-runn-cron-하드코딩-aws-액세스-키--규모-재확인-70개-파일-psapp-백엔드-전체]] 에서 이미 특정된 **kimps 소유 개인 장기 액세스 키**와 동일.
+
+**함의:** 로컬에서 `pnpm dev`/`tsx src/scripts/*.ts` 로 이 리포 코드를 돌리면 (env로 다른 `AWS_PROFILE` 지정하지 않는 한) kimps님 개인 키를 그대로 쓰게 됨. 새 스크립트/모니터를 추가해 로컬에서 테스트할 때 "어느 자격증명으로 호출되는지" 의심스러우면 코드가 아니라 `aws configure list` 로 확인할 것. 운영(배포) 환경의 인증 방식(IAM Role 여부 등)은 별개이며 이 위키에 기록된 바 없음 — 확인 안 된 채로 남겨둠.
+
+---
+
+## [AWS+src] webpack `DefinePlugin`이 `process.env`를 통째로 얼려서 Lambda 기본 자격증명 체인을 깨뜨림  #gotcha
+
+`~psapp`(ps_aws 리포 밖) 의 `admin-*-restapi`/`user-*-restapi` 계열이 공유하는 `webpack.config.cjs` 보일러플레이트가 이런 패턴을 씀:
+
+```js
+const raw = Object.keys(process.env).reduce((env, key) => { env[key] = process.env[key]; return env; }, {});
+new webpack.DefinePlugin({ "process.env": { ...raw, ...envVars, NODE_ENV } });
+```
+
+`Object.keys(process.env)` = **`.env.{stage}` 파일이 아니라 빌드를 실행한 사람의 로컬 셸 환경변수 전체.** 이게 `"process.env": {...}` 형태(dotted key 아니라 통째 객체)로 DefinePlugin에 들어가면, **`process.env` 참조 자체가 이 얼어붙은 객체로 치환됨** — dot 접근(`process.env.KEY`)뿐 아니라 bracket 접근(`process.env[dynamicKey]`, AWS SDK 내부 패턴)과 `process.env`를 통째로 다른 함수에 넘기는 경우까지 전부.
+
+**결과 두 가지:**
+1. **AWS SDK 기본 자격증명 체인이 깨짐.** 빌드 머신 셸엔 `AWS_ACCESS_KEY_ID` 같은 게 보통 없어서(이 계정은 `~/.aws/credentials` 파일 방식) 얼어붙은 객체에 그 키가 없음 → Lambda가 실제로 주입하는 값 대신 `undefined` → `CredentialsProviderError: Could not load credentials from any providers`. 하드코딩 자격증명을 제거하고 IAM Role 기반으로 전환하려는 시도가 전부 이걸로 실패함.
+2. **로컬 셸의 실제 시크릿이 배포 번들에 통째로 새겨짐.** `GITHUB_TOKEN`, `LINEAR_API_KEY`, `SERVER_KEY_NOTION`, `SERVER_KEY_GEMINI_API_KEY`, `MYSQL_PASSWORD` 등 개발자 로컬 환경의 진짜 시크릿 수백 개가 평문으로 배포됨. `admin-etc-restapi`도 동일 패턴 확인 — **15개+ 리포 공통 보일러플레이트라 전부 영향 가능성.**
+
+**fix (검증됨, `admin-dev-restapi` 적용):** `process.env`는 아예 안 건드리고, 빌드타임 값은 별도 전역(`__BAKED_ENV__`)으로만 주입한 뒤 **런타임에** 병합:
+
+```js
+// webpack.config.cjs — AWS_ prefix도 제외해서 이중 안전
+return { __BAKED_ENV__: JSON.stringify({ ...raw(AWS_ 제외), ...envVars, NODE_ENV }) };
+```
+```ts
+// handler.ts 최상단, bootstrap() 호출보다 먼저
+declare const __BAKED_ENV__: Record<string, string>;
+Object.assign(process.env, __BAKED_ENV__);
+```
+
+`Object.assign`은 기존 키를 안 지우므로 Lambda가 실제 주입한 값은 유지되고, `.env.{stage}` 값은 덧붙여져서 `env.MYSQL_HOST` 같은 기존 코드도 그대로 동작.
+
+**배포 전 검증 방법 (중요):** 이 종류의 fix는 이론만으로 확신하지 말 것 — 로컬에서 실제로 빌드하고 산출물(`.aws-sam/build/handler.js`)을 직접 열어 확인, 가능하면 `sts assume-role`로 받은 실제 Lambda role의 임시 자격증명만 있는 깨끗한 환경에서 실제 AWS 호출까지 재현해서 검증한 뒤 배포를 제안할 것. 2026-08-17에 이 검증 없이 두 번 연속 프로덕션 배포를 실패시킨 사고 있음.
+
+**미해결:** 시크릿 유출 자체(2번)는 `admin-dev-restapi`에서도 아직 안 고쳐짐(AWS_ prefix만 제외했을 뿐). 15개+ 리포 전체 확인 및 근본 fix(로컬 셸 전체가 아니라 명시적 값만 사용하는 구조로 변경)는 별도 트랙.
+
+상세 [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]].
+
+---
+
+## [src] `admin_doc`(OpenAPI 스펙 저작 리포) 작업 시 함정 모음  #gotcha
+
+`~/docs/admin_doc`(ps_aws 밖)에서 관리자 API 엔드포인트를 새로 추가할 때 겪은 것들. 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].
+
+- **태그명에 하이픈이 있으면 BE 코드 생성이 문법 에러로 실패한다.** 생성기(`ms_dev_doc`)가 태그명을 그대로 JS 식별자(`import`/`class`)로 쓴다 — `dispatch-rules` → `import dispatch-rules from ...`. 기존 관례(`dispatchcase`처럼 구분자 없는 한 단어)를 따를 것.
+- **스펙 원본이 여러 곳에 중복돼 있을 수 있다.** admin-dev-restapi의 스펙은 `admin_doc`의 `etc` 패키지가 아니라 `dev` 패키지(그 부분 복제본)에서 온다 — 새 엔드포인트를 실제로 쓰려면 원본 패키지뿐 아니라 소비 리포가 참조하는 패키지도 같이 고쳐야 한다.
+- **로컬 검증 중엔 `npx admindoc`(package.json 스크립트)을 쓰지 말 것.** 이건 `admin_doc`을 git+ssh 특정 태그로 고정 참조해서, 로컬 `admin_doc` 변경사항이 아직 커밋·태그 갱신 전이면 오히려 **로컬 변경을 원격 버전으로 되돌려버린다**(라우터 재생성 시 신규 등록분 삭제). 로컬 검증 땐 `node <admin_doc 경로>/dist/bin/cli.js -t be -p <prjNm>`을 직접 실행. 원격 태그가 실제로 갱신된 뒤에는 `npx admindoc`이 다시 안전.
+- **operationId 전역 유일성은 Spectral 린트가 안 잡는다.** `node makeopid.js`로 별도 확인 필요.
+
+---
+
+## [src] macOS 대소문자 무시 파일시스템 vs TypeScript의 대소문자 검사  #gotcha
+
+macOS(APFS 기본)는 파일명 대소문자를 구분하지 않는다 — `dispatchRules.ts`와 `dispatchrules.ts`는 같은 파일로 취급되어, 코드 생성기가 소문자로 파일을 써도 조용히 기존 파일에 덮어써진다. 하지만 **`tsc`는 import 경로의 대소문자 일치를 엄격히 검사**해서 `TS1261`(casing mismatch) 에러를 낸다.
+
+`mv old.ts new.ts` 한 번으로는 대소문자만 바뀌는 rename이 실제로 적용 안 될 수 있다(같은 파일로 인식) — `mv old.ts tmp.ts && mv tmp.ts new.ts` 2단계 rename으로 강제해야 실제 디렉토리 엔트리의 대소문자가 바뀐다.
+
+2026-08-17 `admin-dev-restapi`에서 admin_doc 코드 생성기가 `dispatchrules.ts`(소문자)를 쓰는데 먼저 `dispatchRules.ts`(카멜)로 만들어놔서 발생. 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].
+
+---
+
+## [src] admin-dev-restapi는 dev/production 배포 메커니즘이 서로 다름 (CDK vs SAM)  #gotcha
+
+- `pnpm deploy:dev` = `CDK_STAGE=dev npx cdk deploy` — AWS CDK(`cdk/bin/app.ts`, `ms_cdk`의 `MsRestApi` construct). `--require-approval never`로 인터랙티브 확인 없음.
+- `pnpm deploy:prod` = `npx vite-node scripts/deploy.ts --stage production` → 내부적으로 SAM(`sam deploy --config-env production`). changeset 프리뷰 후 **`[y/N]` 인터랙티브 확인이 있음** — 자동화하려면 `echo y | ...`로 넘겨야 함.
+
+둘 다 최종적으로 같은 `.aws-sam/build`(webpack 산출물)를 코드 자산으로 쓰지만 오케스트레이션 도구 자체가 다르다. dev에서 통과했다고 prod 배포 스크립트가 같은 방식으로 동작할 거라 가정하지 말 것. 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].

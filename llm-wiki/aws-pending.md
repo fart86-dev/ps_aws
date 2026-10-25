@@ -337,25 +337,71 @@ aws kms cancel-key-deletion --key-id ad2436d2-...
 
 ---
 
-## cron_serv/driver-runn-cron 하드코딩 AWS 액세스 키 — 소유자 특정 완료
+## cron_serv/driver-runn-cron 하드코딩 AWS 액세스 키 — 규모 재확인 (70개+ 파일, psapp 백엔드 전체)
 
-**상태:** 🟡 사용자 결정 대기 (보안 — 회전/IAM Role 전환 필요)
+**상태:** 🔴 규모 확대 확인 — 사용자 결정 대기 (보안 — 회전/IAM Role 전환 필요, 대규모)
 
-**대상:** `~/sl/cron_serv`, `~/psapp/serv/cron_serv`, `~/psapp/cron/driver-runn-cron`의 12개 이상 파일에 AWS Access Key/Secret이 하드코딩.
+**대상 (2026-08-17 재조사로 대폭 확대):** `AKIAUOUWAIC46JCDIJF6`(fart86, `AdministratorAccess`) 기준 grep 결과 **70개 이상 파일**, `~/psapp`와 `~/sl` 양쪽 트리 전체:
+- `~/psapp/admin/be/*` — admin-dev-restapi, admin-etc-restapi, admin-rtmake-restapi, admin-channel-restapi, admin-driver-restapi, admin-task-restapi, admin-runngroup-restapi, admin-pay-restapi, admin-runn-restapi, admin-rt-restapi, admin-dispatchcase-restapi, admin-board-restapi, admin-user-restapi, admin-msgmanager-restapi 등 15개+
+- `~/psapp/user/be/*` — user-biz-restapi, user-common-restapi, user-make-restapi, user_serv(구세대)
+- `~/psapp/serv/cron_serv/*`, `~/psapp/cron/*` — 기존에 파악한 12곳 포함
+- `~/sl/*` — 구세대 모노레포(`admin_serv`, `admin_ex_serv`, `cron_serv`, `awsinfra` 등) 동일 키로 전면 오염
+- 서비스 범위: RDS start/stop, S3, Kinesis, Athena, Lambda invoke, CloudWatch, WAF, SES(msg) 등 거의 모든 AWS 서비스 접점
 
-**왜:** khj.dev 오프보딩([[aws-ops/2026-07-18-khj-dev-offboarding]]) 조사 중 실제 키 ID로 전수 검색해서 소유자 특정:
-- `AKIAUOUWAIC4676HY4KB` = **kimps** (`runnstatus/handler.ts`, `runnstatus/eventBridge.ts`)
-- `AKIAUOUWAIC46JCDIJF6` = **fart86** (`infra/config.ts`, `board/aws.ts`, `evtgateway/aws.ts`, `watch/*`, **`runn/S3Export.ts`(위치정보 야간 익스포트)**, `runn/athena.ts`, `runn/s3.ts`, `driver-runn-cron` 4개 파일 등 12곳 이상)
-- `AKIAUOUWAIC4WUMHB5VD` = **email** (`cron-common/SendEmailService.ts`)
+**추가 발견:**
+- `AKIAUOUWAIC46JCDIJF6` **생성일 2024-12-28** — CLAUDE.md에 기록된 "계정 마비 사고" 당일. 사고 복구 과정에서 발급된 키가 그대로 전 코드베이스에 박힌 것으로 추정(미확인, 추측 표시).
+- fart86 소유의 **또 다른 활성 키 `AKIAJY6O2CCORSXENWPQ`(생성 2019-01-13, 7년+)** 존재 — 코드 grep으로는 하드코딩 위치 못 찾음. 별도 orphan 키 정리 후보([[#kms-test_key_1]]류와 유사 패턴, 사용처 확인 필요).
+- `~/psapp`, `~/sl` 둘 다 2026-01~08 최근까지 커밋 활발 — **죽은 코드 아님, 실사용 중.**
+- `admin-dev-restapi`의 `src/utils/rds.ts`/`file.utils.ts`는 이미 git 커밋됨(`1c2ff0b`) — 다른 리포들도 커밋 여부 개별 확인 필요(미확인).
 
-fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이프라인이 이 계정 키로 동작 중이라는 뜻.
+**왜 원래 항목보다 훨씬 큰가:** 기존 khj.dev 오프보딩 조사([[aws-ops/2026-07-18-khj-dev-offboarding]])는 `cron_serv`/`driver-runn-cron` 범위만 grep했음. 2026-08-17 `admin-dev-restapi` AWS 인증 코드 확인 중 우연히 같은 키를 재발견해 전체 psapp/sl 트리로 grep 범위를 넓혔더니 실제 규모가 12곳이 아니라 70곳+ 이었음.
 
-**잠재 효과:** 장기 자격증명 하드코딩은 유출 시 계정 전체 장악 위험. IAM Role 기반(Lambda 실행 역할)으로 전환하는 게 표준.
+**키 소유자 원본 정보 (khj.dev 오프보딩 조사, 2026-07-18):**
+- `AKIAUOUWAIC4676HY4KB` = **kimps**
+- `AKIAUOUWAIC46JCDIJF6` = **fart86** (`AdministratorAccess`, 이번 재조사 대상)
+- `AKIAUOUWAIC4WUMHB5VD` = **email**
+
+**잠재 효과:** 장기 자격증명(그것도 `AdministratorAccess`) 하드코딩이 유출 시 계정 전체 장악 위험. 단순 로테이션이 안 되는 이유: `ms_sam` 배포 툴체인이 시크릿을 빌드타임에 webpack `BannerPlugin`으로 번들에 굽는 구조라서, 코드 수정만으론 전파 안 되고 **로테이션 전 전량 재배포 순서를 지켜야** 장애 없음.
+
+**규모 판단 (2026-08-17):** 이건 코드 몇 줄 수정이 아니라 **psapp 백엔드 전체의 AWS 인증 방식을 IAM Role 기반으로 전환하는 별도 프로젝트** 급. RDS 사설화 로드맵(수개월 규모)과 비슷하거나 그 이상. 이 ps_aws 리포 범위 밖 — 별도 프로젝트로 분리 필요.
+
+**다음 행동 (실행은 별도 세션/프로젝트로 분리, 2026-08-17 사용자 결정):**
+1. 각 Lambda 실행 역할(IAM Role)에 필요한 권한(RDS/S3/Kinesis/Athena/Lambda invoke/CloudWatch/WAF/SES)이 이미 있는지 확인 → 없으면 부여
+2. 70개+ 파일에서 `credentials: { accessKeyId, secretAccessKey }` 블록 제거 → SDK 기본 체인(role 자동 사용)으로 전환 — 패턴이 거의 동일해 codemod 스크립트 일괄 처리 가능해 보임(미검증)
+3. 전량 재배포 (기존 배포 아티팩트엔 여전히 평문 키 존재 — 코드 수정만으론 무효)
+4. `AKIAUOUWAIC46JCDIJF6` 모든 소비자 role 전환 확인 후 deactivate → 관찰 → delete
+5. `AKIAJY6O2CCORSXENWPQ`(7년 orphan) 별도 사용처 확인 후 정리 검토
+6. git 히스토리에 남은 평문 키 정리는 우선순위 낮음(로테이션되면 무력화) — 필요 시 리포별 history rewrite
+
+**진행 상황 — `admin-dev-restapi` 파일럿 완료 (2026-08-17, production+dev 스택 모두 배포·검증 끝):**
+- IAM 정책 `admin-dev-restapi-rds-dev-control` 생성(`dev-mshuttle` 전용, Describe/Start/Stop만) → `custom-lambda-role-production`과 `custom-lambda-role-dev` 양쪽에 부착 완료. production-mshuttle은 물리적으로 불가.
+  - 실제 코드 사용 범위 확인: `controller/rds.ts`가 애초에 `dev-mshuttle`/`staging-mshuttle`만 허용(production 진입 자체가 코드상 불가). `staging-mshuttle`은 이미 폐기되어 미존재 → 실질 대상은 `dev-mshuttle` 하나.
+- `src/utils/rds.ts`에서 하드코딩 credentials 블록 제거 → 코드 자체는 문제없었으나, **배포 후 별개의 훨씬 큰 문제(webpack `DefinePlugin`이 `process.env`를 통째로 얼려서 Lambda 기본 자격증명 체인이 깨짐 + 로컬 셸 시크릿 전체가 배포 번들에 유출)를 발견·수정** — 상세 [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]], gotcha [[gotchas#awssrc-webpack-defineplugin이-processenv를-통째로-얼려서-lambda-기본-자격증명-체인을-깨뜨림]].
+- **최종 결과:** production 배포(04:06:46 UTC) 정상 확인(에러 0건), dev 스택도 동일 정책 부착 후 정상 확인. `dev-mshuttle`이 양쪽 관리자 화면에 정상 표시됨.
+- **후속으로 남은 것:**
+  - 이 webpack DefinePlugin 패턴이 `admin-etc-restapi` 등 15개+ 리포 공통 보일러플레이트라 전부 영향 가능성 — 아래 신규 항목([[#webpack-defineplugin이-processenv-경유로-로컬-셸-시크릿-전체를-배포-번들에-유출-15개-리포-영향-가능성]]) 참조
+  - 나머지 69개+ 파일(fart86 키)은 이 파일럿에서 검증된 패턴(role 권한 확인→부여, credentials 제거, **webpack 시크릿 유출 gotcha 먼저 확인**, 배포 전 로컬 빌드 검증, 다른 변경사항과 분리해서 배포)을 그대로 적용
+  - `AKIAUOUWAIC46JCDIJF6` deactivate는 모든 소비자 전환 확인 후(아직 1/70+)
+- **추가 (같은 날, 별건):** `admin-dev-restapi`에 신규 기능(`/eventbridge/list`, dispatch-one-time 규칙 조회 API) 추가하면서 같은 패턴(role 권한 확인→최소권한 정책 신설→assume-role 검증→dev 먼저 배포→production 배포) 한 번 더 실증. `admin-dev-restapi-eventbridge-read` 정책 신설, 양쪽 role에 부착. role/정책 전체 인벤토리는 [[aws-inventory/admin-dev-restapi-iam]], 상세 [[aws-ops/2026-08-17-admin-dev-restapi-eventbridge-endpoint]].
+- **추가 발견 (2026-08-18):** `~/psapp/cron/driver-runnstatus-cron/src/utils/aws/eventBridge.ts`(및 `~/psapp/serv/cron_serv/packages/runnstatus/src/utils/aws/eventBridge.ts` 동일 파일 추정, 미확인)에 **kimps 키(`AKIAUOUWAIC4676HY4KB`, 2024-12-28 발급)**가 2군데(client 초기화 + cleanup 함수) 하드코딩. fart86 키(70개+ 파일)와 별개의 노출 건 — dispatch-one-time 규칙 정리 실패 원인 조사([[aws-ops/2026-08-18-dispatch-one-time-rule-cleanup-failure-investigation]]) 중 우연히 발견. **일단 기록만, 조치는 안 함.**
+
+---
+
+## webpack DefinePlugin이 process.env 경유로 로컬 셸 시크릿 전체를 배포 번들에 유출 (15개+ 리포 영향 가능성)
+
+**상태:** 🔴 미해결 (2026-08-17 발견, `admin-dev-restapi`만 부분 완화 — AWS_ prefix만 제외, 근본 원인은 그대로)
+
+**대상:** `~psapp`(ps_aws 리포 밖) 의 `admin-*-restapi`/`user-*-restapi` 계열이 공유하는 `webpack.config.cjs` 보일러플레이트. `admin-dev-restapi`, `admin-etc-restapi` 확인됨 — CLAUDE.md에 "동일 보일러플레이트에서 분기"라 적혀있어 **15개+ 리포 전부 같은 구조일 가능성 높음(미검증)**.
+
+**왜:** `getEnvVar()`가 `Object.keys(process.env)`(빌드 실행자의 로컬 셸 환경변수 전체)를 `webpack.DefinePlugin({"process.env": {...}})`으로 번들에 통째로 굽는 구조. 실제 배포된 `admin-dev-restapi` 번들을 열어보니 `GITHUB_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `LINEAR_API_KEY`, `SERVER_KEY_NOTION`, `SERVER_KEY_GEMINI_API_KEY`, `SERVER_KEY_SLACKWEBHOOK_*`, `MYSQL_PASSWORD`, `MONGO_PASSWORD` 등 개발자 로컬 환경의 실제 시크릿 수백 개가 평문으로 배포 번들에 포함돼있었음. 상세 발견 경위 [[aws-ops/2026-08-17-admin-dev-restapi-webpack-credential-chain-fix]], gotcha [[gotchas#awssrc-webpack-defineplugin이-processenv를-통째로-얼려서-lambda-기본-자격증명-체인을-깨뜨림]].
+
+**잠재 효과:** 이 Lambda 코드(`GetFunction`)나 S3 배포 아티팩트(`ms-sam` 버킷)에 접근 권한이 있는 사람/역할이면 누구나 GitHub 토큰, Linear API 키, 각종 서드파티 서비스 키, DB 비밀번호를 평문으로 열람 가능. 배포할 때마다(빌드 실행자가 바뀔 때마다) 내용이 갱신되며 계속 유출됨 — 일회성 사고가 아니라 **구조적으로 매 배포마다 반복**.
 
 **다음 행동:**
-- 각 Lambda(driver-runn-cron 등)를 실행 역할(IAM Role) 기반으로 전환 — 코드에서 `accessKeyId`/`secretAccessKey` 하드코딩 제거
-- 전환 전까지는 최소한 해당 키 로테이션 주기 확인
-- `fart86`이 실제 활성 서비스 계정인지, 아니면 이 계정도 정리 대상인지 확인 필요(khj.dev처럼 콘솔 로그인은 오래전(2018)이라 사람 사용은 아닌 것으로 보이나 액세스키는 활발히 쓰임 — 서비스 계정으로 판단됨)
+1. `admin-etc-restapi` 포함 나머지 admin-*/user-*-restapi 리포 전체가 동일 `getEnvVar()` 패턴인지 확인 (`grep -n "Object.keys(process.env)" webpack.config.cjs`)
+2. 확인되면 전체 리포에 근본 fix 적용 — `admin-dev-restapi`에서 검증된 패턴: `process.env`는 안 건드리고 `__BAKED_ENV__` 별도 전역 + 런타임 `Object.assign` 병합 (AWS_ prefix 제외 필수)
+3. 이미 배포된 과거 아티팩트(`ms-sam` S3 버킷의 각 리포별 과거 타임스탬프 버전들)에도 이 유출이 누적돼있음 — 라이프사이클/접근 IAM 최소화 필요(운영 DB 평문 자격증명 건과 동일한 성격, [[#운영-db-평문-자격증명-processenv-로깅-사설화와-무관-즉시-조치]] 참조)
+4. 유출된 것으로 확인된 개별 시크릿(GITHUB_TOKEN, LINEAR_API_KEY, SERVER_KEY_NOTION, SERVER_KEY_GEMINI_API_KEY 등)은 로테이션 검토 대상 — 실제 악용 여부와 무관하게 노출 자체가 사고
 
 ---
 
@@ -436,6 +482,32 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 
 ---
 
+## RDS for MySQL 마이너 버전 지원 종료 (AWS Health 공지, 2026-08-14 수신)
+
+**상태:** ✅ 완료 (2026-08-16)
+
+**대상:** `production-mshuttle`, `production-mshuttle-read1` (둘 다 MySQL 8.4.5, 파라미터 그룹 `params-production-mysql84` 공유, MultiAZ 아님). `dev-mshuttle`(8.4.9)은 해당 없음, `spd-test`는 postgres라 무관.
+
+**왜:** AWS Health 공지 — RDS for MySQL 마이너 버전 8.4.5, 8.4.6, 5.7.44-RDS.20250213/0508/0818이 **2026-10-31 표준 지원 종료**. 계정 실측(2026-08-14)으로 production 2대가 8.4.5임을 확인, 공지 대상에 해당함.
+
+**일정:**
+- 2026-10-01~: 해당 마이너 버전으로 신규 인스턴스 생성 불가 (기존 인스턴스는 무관)
+- 2026-10-31 이후 예정된 유지관리 기간 중: AWS가 production-mshuttle / read1을 **자동으로** 8.4.8(또는 그 이상)로 강제 업그레이드 — **다운타임 발생**. 선제 조치 없으면 다운타임 시점·방식을 AWS 유지관리 창에 맡기게 됨.
+
+**잠재 효과:** 메이저 버전 변경 아님(8.4.x 내 마이너 업그레이드)이라 호환성 리스크는 낮은 편이나, production 다운타임은 불가피 — 수동 선제 업그레이드로 시점을 통제할지, AWS 자동 업그레이드에 맡길지가 핵심 결정.
+
+**소요 시간 검토 (2026-08-14):** 메이저 버전 변경이 아니라 작업량 자체는 크지 않음. 두 방식의 트레이드오프:
+- **인플레이스 업그레이드(`modify-db-instance`):** 실행은 짧지만, 두 인스턴스 모두 `MultiAZ: false`라 적용 시 재부팅에 따른 실다운타임 발생(통상 수 분 단위, 정확한 시간은 실행해봐야 확인 가능). 관건은 트래픽 낮은 시간대 선택.
+- **Blue/Green Deployment (AWS 권장):** 전환 순간 다운타임은 훨씬 짧지만(초 단위), green 환경 생성·복제 캐치업·검증까지 준비 시간이 반나절~하루 정도 필요. production 대상이라 롤백 안전망 있는 이쪽이 더 안전.
+- **순서:** read replica(`production-mshuttle-read1`)를 source(`production-mshuttle`)보다 먼저(또는 같이) 올리는 게 일반적 권장 순서.
+- **시급성 낮음:** 지원 종료(2026-10-31)까지 약 2.5개월 여유 — 지금 당장 서두를 필요는 없음.
+
+**결정 (2026-08-16):** 인플레이스 업그레이드로 진행. dev-mshuttle이 8.4.9로 오래 안정적으로 운영된 이력을 8.4.x 라인 검증 근거로 판단, Blue/Green 없이 바로 진행하기로 함. 실행 시점은 **오늘밤~내일 새벽**(사람이 적은 시간대) — 사용자가 해당 시간대면 다운타임 영향 충분히 낮다고 판단.
+
+**결과 (2026-08-16 실행):** 양쪽 다 8.4.9로 업그레이드 완료. 실다운타임 — replica 약 2분 37초, source 약 2분 20초. 절차·이벤트 로그 [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade]] 참조. 스냅샷 `production-mshuttle-pre-8-4-9-upgrade-2026-08-16`은 1~2주 안정화 후 정리 여부 결정 필요.
+
+---
+
 ## 운영 DB 평문 자격증명 · process.env 로깅 (사설화와 무관, 즉시 조치)
 
 **상태:** 🔴 즉시 조치 필요 (사설화 로드맵보다 급함)
@@ -472,6 +544,67 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 
 ---
 
+## CloudShell 홈 디렉토리 삭제 예정 (ap-northeast-2, 120일 미사용)
+
+**상태:** ⏳ 2026-08-25 시한 (AWS Health 공지, 2026-08-16 수신)
+
+**대상:** ap-northeast-2 리전에서 CloudShell을 110일+ 미사용한 사용자들의 CloudShell 홈 디렉토리(개인 스토리지). 대상 사용자 목록은 Health Dashboard "Affected Resources" 탭(콘솔 전용, API 조회 불가 — Business/Enterprise 지원 플랜 필요, RDS Health 조회 때와 동일 제약).
+
+**왜:** AWS가 120일 미사용 CloudShell 홈 디렉토리를 2026-08-25에 자동 삭제 예정. 저장된 개인 스크립트/파일이 있으면 유실.
+
+**잠재 효과:** 낮음 — RDS/DynamoDB 등 실제 데이터 자산과 무관한 개인 스토리지. 이 계정 작업 방식이 로컬 CLI/aws-mcp 위주라 ap-northeast-2 CloudShell에 중요한 걸 저장해둔 사람이 있을 가능성 낮다고 판단(2026-08-16).
+
+**다음 행동:**
+- 콘솔에서 Health Dashboard "Affected Resources" 확인 → 실제로 저장해둔 게 있는 사용자 있으면 2026-08-25 전에 해당 계정으로 CloudShell 한 번 실행(삭제 취소됨)
+- 아무도 안 쓰는 것 같으면 별도 조치 없이 흘려보내도 무방
+
+---
+
+## 실시간/고빈도 컴포넌트 로깅 설정 상시 점검
+
+**상태:** ✅ 이 계정의 AppSync/Firehose 전수 점검·조치 완료 (2026-09-08). 원칙은 신규 컴포넌트에 계속 적용.
+
+**대상:** WebSocket 구독·실시간 위치 트래킹·Streams 소비자처럼 트래픽에 비례해 요청 빈도가 매우 높은 컴포넌트 전반.
+
+**왜:** 이런 컴포넌트는 사후에 비용/Free Tier 초과로 발견되기 전까지 아무도 모른 채 방치되기 쉬움. 사후 대응이 아니라 **신규 배포·설계 시점부터 로깅 설정을 기본 점검 항목에 넣어야** 재발을 막을 수 있음 (사용자 지시, 2026-09-08).
+
+**진행 경과:**
+1. `driver-tracking-api-production`에서 최초 발견 — 월 8~12GB로 CloudWatch 무료 한도(5GB) 초과.
+2. AppSync API 6개 전수 점검 → `driver-tracking-{api,alert-api}-{production,dev}` 4개가 동일 결함(`excludeVerboseContent:false`) 확인, 나머지 2개(`appsync-driver-api-production`, `drv_runn`)는 이미 정상.
+3. Kinesis Firehose 활성 스트림 10개 점검 → 배달 실패시에만 로깅하는 구조라 애초에 위험 없음, 조치 불필요 확인.
+4. **1차 조치(`excludeVerboseContent:true`)를 실측 검증 없이 완료 처리했다가 오판으로 판명** — 적용 전/후 이벤트당 평균 바이트가 335→333bytes로 무변화. `fieldLogLevel:NONE`에서는 이 옵션 자체가 영향을 주는 로그 타입이 생성되지 않기 때문. gotcha 등록: [[gotchas#aws-appsync-excludeverbosecontent는-fieldloglevel-none일-때-효과가-없음--진짜-원인은-요청량]].
+5. **최종 조치**: 4개 API 전부 CloudWatch Logs 로깅 완전 비활성화(`UpdateGraphqlApi` 호출 시 `logConfig` 생략 → 로깅 disable). `AWS/AppSync` 기본 메트릭(Latency/에러율)은 유지, `RequestSummary` 요청 단위 로그만 소실.
+
+상세 [[aws-ops/2026-09-08-cloudwatch-freetier-appsync-verbose-logging]].
+
+**점검 체크리스트 (신규 실시간 컴포넌트 배포 시 계속 적용):**
+- AppSync: 로깅이 정말 필요한지 먼저 판단 — 필요 없으면 `logConfig` 자체를 안 넣는 게 가장 확실. 필요하면 `fieldLogLevel`+`excludeVerboseContent` 설정, **적용 후 반드시 전/후 실측(이벤트당 평균 바이트)으로 효과 검증**
+- Lambda: 로그 레벨(디버그 로그 상시 on 여부), 고빈도 크론/이벤트 소스일수록 영향 큼
+- Kinesis/DynamoDB Streams 소비자: CloudWatch 커스텀 메트릭 발행 빈도
+- 모든 로그 그룹: retention 설정 여부 ([[#cloudwatch-logs-retention-정책]]과 연계)
+
+**다음 행동:**
+- [ ] 익일 이후 4개 API 로그 그룹에 신규 로그 실제로 안 들어오는지 확인
+- [ ] 다음 달 Cost Explorer `APN2-DataProcessing-Bytes`가 5GB 이내로 들어오는지 확인
+- [ ] 로깅 완전 차단 후 장애 디버깅에 실제 지장 있으면 `fieldLogLevel:ERROR` 정도로 최소 재활성화 검토
+- [ ] 신규 실시간 컴포넌트 설계/배포 시 위 체크리스트를 배포 전 확인 항목으로 포함
+
+---
+
+## production-admin-test CloudFront 후속 (DNS + 콘텐츠 업로드)
+
+**상태:** 🟢 사용자 진행 대기
+
+**대상:** 신규 Distribution `E3W54LLJ0M7SFV` (`production-admin-test`, `d2qzb9axi7zh9z.cloudfront.net`).
+
+**왜:** 2026-09-02 `production-admin-drvcontr`(`E3H054W7ITS1QP`) 설정 복제로 생성. Origin `admin.modoo/test`, Alias `admin-test.modooshuttle.com`. 상세 [[aws-ops/2026-09-02-cloudfront-admin-test-distribution]].
+
+**다음 행동:**
+- [ ] DNS: `admin-test.modooshuttle.com` → `d2qzb9axi7zh9z.cloudfront.net` CNAME 등록 (사용자 직접)
+- [ ] S3 `admin.modoo/test/` prefix 비어있음 — 빌드 산출물 업로드 필요
+
+---
+
 ## (참고) 완료된 작업
 
 - ✅ 2026-06-01 VPC/EC2/SG/EIP/ENI/AMI/Snapshot/Glue/DataZone 정리 → [[aws-ops/2026-06-01-vpc-ec2-cleanup]]
@@ -485,3 +618,4 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 - ✅ 2026-07-01 msdeveloper STD 30→7일 단축 (-$40/월 예상) → [[aws-ops/2026-07-01-msdeveloper-s3-lifecycle-shorten]]
 - ✅ 2026-07-01 DynamoDB drv_runn_*_production 5개 삭제 (-$25/월) → [[aws-ops/2026-07-01-dynamodb-drv-runn-cleanup]]
 - ✅ 2026-07-02 DynamoDB dev 4개 오삭제 복구 및 재발 방지 (순 절감 -$34/월) → [[aws-ops/2026-07-02-dynamodb-recovery-and-lessons]]
+- ✅ 2026-08-16 RDS for MySQL 마이너 버전 인플레이스 업그레이드 8.4.5 → 8.4.9 (AWS Health 지원종료 대응) → [[aws-ops/2026-08-16-rds-mysql-minor-version-upgrade]]

@@ -153,3 +153,13 @@ updated: 2026-06-26
 ## bus_factor: 1
 
 **현실:** 이 리포의 의도·역사·운영 컨텍스트를 아는 사람이 사실상 한 명. 따라서 이 위키의 가치가 크다. 모르는 게 나오면 임의 해석하지 말고 `#todo` 로 남길 것.
+
+---
+
+## dispatch-rules-status는 CLI 플래그·Fastify 라우트 없이 2파일만 (2026-08-17)
+
+**결정:** `dispatchRules.ts`(함수 파일) + `dispatchRulesStatus.ts`(실행 파일) 2개로만 구성. `--json`/`--stale`/`--prefix` 같은 CLI 플래그와 `GET /infra/dispatch-rules` Fastify 라우트는 만들었다가 제거.
+
+**왜:** 처음엔 `rds:status`/`waste` 패턴을 그대로 따라 CLI 플래그 + HTTP 라우트까지 다 갖췄으나, 사용자가 "사용법을 단순화"를 명시적으로 요청 — 이 도구는 정기 모니터링/알림 대상이 아니라 가끔 손으로 돌려보는 감사(audit) 도구라 그 정도 확장성이 필요 없다고 판단.
+
+**어떻게 적용:** 비슷한 "가끔 손으로 돌리는 감사 스크립트"를 새로 만들 때, `rds:status`처럼 풀옵션으로 갈지 이 패턴처럼 무옵션 2파일로 갈지는 **정기 점검/알림 대상인지 아닌지**로 판단. 정기 점검 대상이면 `infra-monitor/index.ts` + `server.ts` + notifiers 3군데 등록(위 "새 서비스 모니터링 추가" 참고), 일회성 감사면 이 패턴처럼 최소화.

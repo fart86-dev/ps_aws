@@ -67,4 +67,27 @@ export interface WasteReport {
   totals: Record<WasteCategory, number>;
 }
 
+export type DispatchRuleStatus = "upcoming" | "fired" | "overdue-no-invocation" | "unparseable";
+
+export interface DispatchRuleReport {
+  name: string;
+  state: string | undefined;
+  description: string | undefined;
+  scheduleExpression: string | undefined;
+  fireTimeUtc: string | null;
+  fireTimeKst: string | null;
+  namedDate: string | null;
+  dispatchId: string | null;
+  isTest: boolean;
+  target: {
+    functionArn: string | undefined;
+    action: string | null;
+    driverName: string | null;
+    statusId: string | null;
+  } | null;
+  invocations: number;
+  failedInvocations: number;
+  status: DispatchRuleStatus;
+}
+
 // testeststet111
