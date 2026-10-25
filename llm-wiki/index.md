@@ -47,6 +47,7 @@ updated: 2026-07-30
 - [[aws-ops/2026-07-20-ttl-under-retention-finding-and-fix]] — TTL 7일이 "이용·제공사실 확인자료" 법정 최소보관(6개월 추정) 미달 가능성 발견, TTL 180일로 코드 수정(미배포)
 - [[aws-ops/2026-07-20-agent-toolkit-setup]] — AWS 공식 Agent Toolkit 설정 (CLI 2.36 업그레이드 + Claude Code용 aws-mcp 연결, macOS 계정 전역 영향 주의)
 - [[aws-ops/2026-07-30-vpc-rds-privatization-design]] — RDS 4대 인터넷 노출(GuardDuty 악성 IP 스캔 탐지) 대응, 완전 사설화 단계별 로드맵 설계 (Phase 0 착수 승인 대기)
+- [[aws-ops/2026-10-15-bedrock-aup-notice-and-haiku-5-5]] — Bedrock Anthropic AUP 갱신 통지(2026-11-12 효력) 조사, Health API 미구독 확인 + 호출 주체 Lambda 1개 특정, Bedrock 5.5 세대(Haiku 5.5) 등장 확인
 - 재사용 절차:
   - [[aws-runbooks/rds-shrink-migration]] — RDS storage 축소 (dump/restore swap)
   - [[aws-runbooks/cloudfront-function-attach]] — Distribution 에 Function 일괄 연결

@@ -1,6 +1,6 @@
 ---
 type: aws-pending
-last_updated: 2026-07-30
+last_updated: 2026-10-15
 ---
 
 # AWS 진행 중 / 보류 / 후속 작업 통합
@@ -454,6 +454,21 @@ fart86은 `AdministratorAccess` 보유 — 위치정보 DynamoDB export 파이�
 3. 하드코딩 6곳 제거 → `process.env` 경유로 통일
 4. `console.log(process.env)` 15개 파일 제거
 5. `ms-sam` S3 버킷 접근 IAM 최소화 + 라이프사이클로 구 아티팩트 만료
+
+---
+
+## Bedrock Anthropic 약관 갱신 + Haiku 모델 교체
+
+**상태:** 🟡 사용자 결정 대기 / ⏳ 2026-11-12 시한
+
+**대상:** Lambda `production-ps-channel-meets-analyzer` (Bedrock Anthropic 유일 호출 주체, 10분 주기 · 30일 약 1,300회).
+
+**배경:** 2026-10-15 AWS Health 계정 공지 — Anthropic Usage Policy 가 2026-11-12 부로 갱신. 모델 가용성·가격·API 동작·모델 ID 변화 없음(본문 명시), 콘솔 작업 불필요. 조사 전문 → [[aws-ops/2026-10-15-bedrock-aup-notice-and-haiku-5-5]]
+
+**다음 행동:**
+1. **AUP 갱신본 대조** (법무·보안) — 이 Lambda 가 채널 미팅 데이터를 다루므로 입력에 개인정보·고객 발화 포함 여부가 검토 포인트. 11-12 이후 계속 호출 = 갱신 약관 동의로 간주됨.
+2. **Haiku 4.5 → 5.5 교체 검토** — 사용자가 직접 진행 예정 (2026-10-15 명시, 자동 진행 금지). `anthropic.claude-haiku-5-5` ACTIVE 확인됨. 선행 확인: 함수 소스의 모델 ID 지정 방식 + 프롬프트. 5.5 는 `INFERENCE_PROFILE` 전용이나 현재도 `global.` 프로파일 경유라 호출 방식 동일. 단가는 Bedrock 파트너 과금표 별도 확인.
+3. **Health 이벤트 수집 경로 신설** (미제안) — 계정이 Basic/Developer 플랜이라 Health API 가 `SubscriptionRequiredException`. EventBridge `aws.health` 룰도 없어 현재 **이메일 수신 외 자동 수집 경로 전무**. Telegram/Slack 전달 룰 추가 가능.
 
 ---
 
